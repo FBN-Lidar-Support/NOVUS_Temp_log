@@ -1,0 +1,315 @@
+import os
+import sys
+import time
+import pandas as pd
+import configparser
+from datetime import timedelta
+from PyQt5 import uic, QtWidgets
+from PyQt5.QtWidgets import QApplication, QHeaderView, QMainWindow, QInputDialog, QLineEdit, QTableWidget, QTableWidgetItem, QMessageBox
+from PyQt5.QtCore import QTimer, QUrl, Qt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
+import matplotlib.dates as mdates
+from collections import deque
+
+from novus import read_temp
+from fitsdll import fn_Handshake, fn_Query, fn_Log
+
+# Matplotlib canvas class to create figure
+class MplCanvas(Canvas):
+    def __init__(self, parent=None):
+        self.fig = Figure()
+        self.ax = self.fig.add_subplot(111)
+        super().__init__(self.fig)
+        self.setParent(parent)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.updateGeometry()
+
+    def save_image(self, filepath):
+        self.figure.savefig(
+            filepath,
+            dpi=150,
+            bbox_inches="tight"
+        )
+
+class MainAppWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --disable-software-rasterizer"
+        self.allow_close = False
+        self.config = configparser.ConfigParser()
+        try:
+            self.config.read(r"C:\Projects\novus_Temp_log\Properties\Config.ini")
+            self.LogPath = self.config["DEFAULT"].get("LogPath", "")
+        except Exception as e:
+            QMessageBox.critical(None, "Close Program", f"{e}\nPlease check config.ini")
+            self.exit_confirm_enabled = False
+            quit()
+
+        if not os.path.exists(self.LogPath):
+            os.makedirs(self.LogPath, exist_ok=True)
+
+        uic.loadUi(r"C:\Projects\novus_Temp_log\Sources\GUI\Main_UI.ui", self)
+        self.TableWidget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+
+        if not os.path.exists(self.LogPath):
+            os.makedirs(self.LogPath, exist_ok= True)
+        
+        self.canvas = MplCanvas(self)
+
+        layout = self.GraphWidget.layout()
+        if layout is None:
+            layout = QtWidgets.QVBoxLayout(self.GraphWidget)
+            layout.setContentsMargins(0,0,0,0)
+            layout.setSpacing(0)
+            self.GraphWidget.setLayout(layout)
+
+        layout.addWidget(self.canvas)
+
+        self.canvas.ax.set_title("Oven Temperature")
+        self.canvas.ax.set_xlabel("Time (H:M:S)")
+        self.canvas.ax.set_ylabel("Temperature (°C)")
+        self.canvas.ax.grid(True)
+
+        self.canvas.ax.xaxis.set_major_formatter(
+            mdates.DateFormatter("%H:%M:%S")
+        )
+        self.canvas.fig.autofmt_xdate()
+
+        self.temp_target = None
+        self.hold_seconds = None
+        
+        self.trigger_region = None
+        self.trigger_time = None
+        self.stop_time = None
+        self.triggered = False
+
+        self.max_points = 120 
+        self.x_live = deque(maxlen=self.max_points)
+        self.y_live = deque(maxlen=self.max_points)
+
+        (self.line,) = self.canvas.ax.plot([], [], linewidth = 2)
+
+        self.oven_status = []
+
+        self.canvas.draw()
+        
+        self.EN_Value.setFocus()
+        self.EN_Value.returnPressed.connect(self.Oven_ID.setFocus)
+        self.QuitButton.clicked.connect(self.on_quit_clicked)
+        self.StartButton.clicked.connect(self.on_start_clicked)
+        self.AddSNButton.clicked.connect(self.Add_Serials)
+
+    def on_start_clicked(self):
+        print("start")
+        self.reset_run()
+        if len(self.EN_Value.text()) == 6:
+            if not self.Oven_ID.text() == "":
+                if self.TableWidget.rowCount() != 0:
+                    self.Oven_Status.setText("Operate")
+                    self.Oven_Status.setStyleSheet("background-color: orange; color black; font-weight: bold;")
+                    self.temp_target = int(self.Target.currentText().split("°C")[0])
+                    self.hold_seconds = int(self.Duration.currentText().split("(")[1].split("sec)")[0])
+                    self.timer = QTimer(self)
+                    self.timer.timeout.connect(self.update_graph)
+                    self.timer.start(1000) # 30 sec per point
+                else:
+                    QMessageBox.warning(self, "Start denied", """Please Press button "Add serial" to add serial before press start""")
+            else:
+                QMessageBox.warning(self, "Start denied", "Please scan Oven ID before press start")
+        else:
+            QMessageBox.warning(self, "Start denied", "employee ID must have 6 digit")
+
+    def Add_Serials(self):
+        cancal = False
+        while not cancal:
+            serial, okPressed = QInputDialog.getText(self, "Insert Serial", "Please Insert serial:", QLineEdit.Normal, "")
+            if okPressed and serial:
+                # print(serial)
+                # Handshake = fn_Handshake()
+                Handshake = True
+                if not Handshake:
+                    continue
+                row = self.TableWidget.rowCount()
+                self.TableWidget.insertRow(row)
+
+                self.TableWidget.setItem(row, 0, QTableWidgetItem(serial))
+                self.TableWidget.setItem(row, 1, QTableWidgetItem(serial))
+                self.TableWidget.setItem(row, 2, QTableWidgetItem(serial))
+                self.TableWidget.setItem(row, 3, QTableWidgetItem(serial))
+            else:
+                cancal = True
+
+    def update_graph(self):
+        now, status, temp = read_temp("COM4", 1)
+        # ----- live plot -----
+        self.x_live.append(now)
+        self.y_live.append(temp)
+        x_num = mdates.date2num(list(self.x_live))
+        self.line.set_data(x_num, list(self.y_live))
+
+        if self.triggered and self.trigger_time is not None:
+            self.oven_status.append("Heated")
+            self.canvas.ax.axvspan(
+                self.trigger_time, 
+                self.x_live[-1], 
+                color="orange",
+                alpha=0.25,
+                zorder=0
+            )
+        else:
+            self.oven_status.append("Warm-Up")
+
+        # ----- trigger ครั้งแรก -----
+        if self.trigger_time is None and temp >= self.temp_target:
+            self.trigger_time = now
+            self.stop_time = now + timedelta(seconds=self.hold_seconds)
+            self.triggered = True
+
+        # ----- countdown -----
+        if self.stop_time is not None:
+            remaining = int((self.stop_time - now).total_seconds())
+            self.TimeLeftLabel.setText(f"{max(0, remaining)}s")
+            if now >= self.stop_time:
+                self.timer.stop()
+                self.TimeLeftLabel.setText("Done")
+                print("Done")
+                QTimer.singleShot(100, self.Result_insert_and_record)
+                return
+            
+        # ----- write Graph with new data -----
+        self.canvas.ax.relim()
+        self.canvas.ax.autoscale_view()
+        self.canvas.draw_idle() # update Graph
+
+    def Result_insert_and_record(self):
+        df_result = pd.DataFrame({"Datetime": self.x_live, "Oven Tempture": self.y_live, "Oven Status": self.oven_status})
+        df_result_filtered = df_result["Oven Status"] == "Heated"
+        print(df_result_filtered)
+
+        Qtable_df = self.qtable_to_df(self.TableWidget)
+        print(Qtable_df)
+        
+        datetimestart = df_result["Datetime"].iloc[0].strftime("%Y-%m-%d_%H-%M-%S")
+        datetimeend = df_result["Datetime"].iloc[-1].strftime("%Y-%m-%d_%H-%M-%S")        
+
+        img_filename = os.path.join(self.LogPath, f"Plot_Oven_{datetimeend}.jpg")
+        self.canvas.save_image(img_filename)
+        time.sleep(0.5)
+        if os.path.exists(img_filename):
+            pass
+        else:
+            QMessageBox.critical(self, "FAIL record fits", "Can not generate image file\nPlease contact Engineer",)
+            return
+        
+        mc_oven = self.Oven_ID.text().strip()
+        csv_filename = os.path.join(self.LogPath, f"{mc_oven}_{datetimeend}.csv")
+        df_result.to_csv(csv_filename, index=False)
+        en = self.EN_Value.text().strip()
+        
+        pcname = os.environ['COMPUTERNAME']
+
+        old_filename = None
+        for idx, row in Qtable_df.iterrows():
+            serial = row["Serial Number"]
+            print("serial:\t", serial)
+            pn = row["Part Number"]
+            new_filename = os.path.join(self.LogPath, serial + os.path.basename(csv_filename))
+            print(new_filename)
+            if old_filename:
+                os.rename(old_filename, new_filename)
+            else:
+                os.rename(csv_filename, new_filename)
+            print("===============================================================")
+            
+            df_fits = {
+                "EN": en,
+                "MC": pcname,
+                "PN": pn,
+                "SN OB": serial,
+                "Machine": mc_oven,
+                "Temp target (°C)": self.temp_target,
+                "Time target (minute)": self.hold_seconds,
+                "Start time": datetimestart,
+                "End time": datetimeend,
+                "Result (Graph)": img_filename,
+                "Result (csv file)": csv_filename, 
+                "Result": "PASS"
+            }
+            old_filename = new_filename
+        os.rename(old_filename, csv_filename)
+
+        self.Oven_Status.setText("Idle")
+        self.Oven_Status.setStyleSheet("background-color: rgb(170, 255, 127); color black; font-weight: bold;")
+        self.TableWidget.setRowCount(0)
+        QMessageBox.information(self, "Finish Oven Record", "Please remove unit out of oven")
+
+    def reset_run(self):
+        self.trigger_time = None
+        self.stop_time = None
+        self.triggered = False
+
+        self.temp_target = None
+        self.hold_seconds = None
+
+
+        self.x_live.clear()
+        self.y_live.clear()
+        self.oven_status.clear()
+
+        # if self.trigger_region is not None:
+        #     self.trigger_region.remove()
+        #     self.trigger_region = None
+
+        self.canvas.ax.clear()
+        self.canvas.ax.set_title("Oven Temperature")
+        self.canvas.ax.set_xlabel("Time (H:M:S)")
+        self.canvas.ax.set_ylabel("Temperature (°C)")
+        self.canvas.ax.grid(True)
+        self.line, = self.canvas.ax.plot([], [], color= "black")
+        self.canvas.draw_idle()
+
+        self.TimeLeftLabel.setText("Waiting...")
+
+    def on_quit_clicked(self):
+        self.allow_close = True
+        self.close()
+
+    def closeEvent(self, event):
+        if self.allow_close:
+            print("Close Software")
+            event.accept()
+        else:
+            event.ignore()
+
+    # -------------------- Helper --------------------
+    def qtable_to_df(self, table):
+        header = []
+        cols = []
+        
+        for c in range(table.columnCount()):
+            item = table.horizontalHeaderItem(c)
+            if item is None:
+                continue
+            text = item.text().strip()
+            if not text:
+                continue
+            header.append(text)
+            cols.append(c)
+        
+        data = []
+        for r in range(table.rowCount()):
+            row = {}
+            for h, c in zip(header, cols):
+                cell = table.item(r, c)
+                row[h] = cell.text() if cell else ""
+            data.append(row)
+
+        return pd.DataFrame(data)
+    
+if __name__ == "__main__":
+    QApplication.setAttribute(Qt.AA_DontCreateNativeWidgetSiblings, True)
+    app = QApplication(sys.argv)
+    main_window = MainAppWindow()
+    main_window.showMaximized()
+    sys.exit(app.exec())
