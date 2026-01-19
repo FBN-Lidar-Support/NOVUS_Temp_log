@@ -4,9 +4,9 @@ import time
 import pandas as pd
 import configparser
 from datetime import timedelta
-from PyQt5 import uic, QtWidgets
-from PyQt5.QtWidgets import QApplication, QHeaderView, QMainWindow, QInputDialog, QLineEdit, QTableWidget, QTableWidgetItem, QMessageBox
-from PyQt5.QtCore import QTimer, QUrl, Qt
+from PyQt6 import uic, QtWidgets
+from PyQt6.QtWidgets import QApplication, QHeaderView, QMainWindow, QInputDialog, QLineEdit, QTableWidget, QTableWidgetItem, QMessageBox
+from PyQt6.QtCore import QTimer, QUrl, Qt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 import matplotlib.dates as mdates
@@ -22,7 +22,7 @@ class MplCanvas(Canvas):
         self.ax = self.fig.add_subplot(111)
         super().__init__(self.fig)
         self.setParent(parent)
-        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        # self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.updateGeometry()
 
     def save_image(self, filepath):
@@ -123,20 +123,29 @@ class MainAppWindow(QMainWindow):
     def Add_Serials(self):
         cancal = False
         while not cancal:
-            serial, okPressed = QInputDialog.getText(self, "Insert Serial", "Please Insert serial:", QLineEdit.Normal, "")
+            self.temp_target = int(self.Target.currentText().split("°C")[0])
+            self.hold_seconds = int(self.Duration.currentText().split("(")[1].split("sec)")[0])
+            serial, okPressed = QInputDialog.getText(self, "Insert Serial", "Please Insert serial:")
             if okPressed and serial:
-                # print(serial)
-                # Handshake = fn_Handshake()
-                Handshake = True
-                if not Handshake:
+                query = fn_Query("*", "*", serial, "#next_opn;#SHIPDATE;#Part_No;#product").split(";")
+                next_opn = query[0]
+                shipdate = query[1]
+                part_no = query[2]
+                product = query[3]
+                opn_list = self.config["Operation Config"].get(f"{self.temp_target}-{self.hold_seconds}", "").split(",")
+                if next_opn and not shipdate:
+                    if next_opn in opn_list:
+                        row = self.TableWidget.rowCount()
+                        self.TableWidget.insertRow(row)
+                        self.TableWidget.setItem(row, 0, QTableWidgetItem(serial))
+                        self.TableWidget.setItem(row, 1, QTableWidgetItem(part_no))
+                        self.TableWidget.setItem(row, 2, QTableWidgetItem(product))
+                        self.TableWidget.setItem(row, 3, QTableWidgetItem(next_opn))
+                    else:
+                        QMessageBox.critical(self, f"Serial {serial} can not oven on this setting")
+                elif query[1]:
+                    QMessageBox.critical(self, f"Serial {serial} has already shiped on {shipdate}")
                     continue
-                row = self.TableWidget.rowCount()
-                self.TableWidget.insertRow(row)
-
-                self.TableWidget.setItem(row, 0, QTableWidgetItem(serial))
-                self.TableWidget.setItem(row, 1, QTableWidgetItem(serial))
-                self.TableWidget.setItem(row, 2, QTableWidgetItem(serial))
-                self.TableWidget.setItem(row, 3, QTableWidgetItem(serial))
             else:
                 cancal = True
 
@@ -214,6 +223,8 @@ class MainAppWindow(QMainWindow):
             serial = row["Serial Number"]
             print("serial:\t", serial)
             pn = row["Part Number"]
+            opn = row["Operation"]
+            product = row["Product Model"]
             new_filename = os.path.join(self.LogPath, serial + os.path.basename(csv_filename))
             print(new_filename)
             if old_filename:
@@ -229,16 +240,22 @@ class MainAppWindow(QMainWindow):
                 "SN OB": serial,
                 "Machine": mc_oven,
                 "Temp target (°C)": self.temp_target,
-                "Time target (minute)": self.hold_seconds,
+                "Time target (minute)": self.hold_seconds/60,
                 "Start time": datetimestart,
                 "End time": datetimeend,
                 "Result (Graph)": img_filename,
                 "Result (csv file)": csv_filename, 
                 "Result": "PASS"
             }
-            old_filename = new_filename
-        os.rename(old_filename, csv_filename)
 
+            parameters = ";".join(df_fits.keys())
+            values = ";".join(df_fits.values())
+            log_status = fn_Log(product, opn, parameters, values)
+            if log_status:
+                old_filename = new_filename
+                os.rename(old_filename, csv_filename)
+            else:
+                QMessageBox.critical(self, "FITs insert failed", "Please conact EXT:7763 Atthaphanp")
         self.Oven_Status.setText("Idle")
         self.Oven_Status.setStyleSheet("background-color: rgb(170, 255, 127); color black; font-weight: bold;")
         self.TableWidget.setRowCount(0)
@@ -308,7 +325,7 @@ class MainAppWindow(QMainWindow):
         return pd.DataFrame(data)
     
 if __name__ == "__main__":
-    QApplication.setAttribute(Qt.AA_DontCreateNativeWidgetSiblings, True)
+    # QApplication.setAttribute(Qt.AA_DontCreateNativeWidgetSiblings, True)
     app = QApplication(sys.argv)
     main_window = MainAppWindow()
     main_window.showMaximized()
