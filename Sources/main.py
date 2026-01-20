@@ -10,7 +10,6 @@ from PyQt6.QtCore import QTimer, QUrl, Qt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 import matplotlib.dates as mdates
-from collections import deque
 
 from novus import read_temp
 from fitsdll import fn_Handshake, fn_Query, fn_Log
@@ -83,10 +82,13 @@ class MainAppWindow(QMainWindow):
         self.trigger_time = None
         self.stop_time = None
         self.triggered = False
+        self.span = None
 
-        self.max_points = 120 
-        self.x_live = deque(maxlen=self.max_points)
-        self.y_live = deque(maxlen=self.max_points)
+        # self.max_points = 600 
+        # self.x_live = deque(maxlen=self.max_points)
+        # self.y_live = deque(maxlen=self.max_points)
+        self.x_live = []
+        self.y_live = []
 
         (self.line,) = self.canvas.ax.plot([], [], linewidth = 2)
 
@@ -112,7 +114,7 @@ class MainAppWindow(QMainWindow):
                     self.hold_seconds = int(self.Duration.currentText().split("(")[1].split("sec)")[0])
                     self.timer = QTimer(self)
                     self.timer.timeout.connect(self.update_graph)
-                    self.timer.start(1000) # 30 sec per point
+                    self.timer.start(100) # 30 sec per point
                 else:
                     QMessageBox.warning(self, "Start denied", """Please Press button "Add serial" to add serial before press start""")
             else:
@@ -154,14 +156,21 @@ class MainAppWindow(QMainWindow):
         # ----- live plot -----
         self.x_live.append(now)
         self.y_live.append(temp)
+
         x_num = mdates.date2num(list(self.x_live))
         self.line.set_data(x_num, list(self.y_live))
 
         if self.triggered and self.trigger_time is not None:
             self.oven_status.append("Heated")
-            self.canvas.ax.axvspan(
-                self.trigger_time, 
-                self.x_live[-1], 
+            t0 = mdates.date2num(self.trigger_time)
+            t1 = x_num[-1]
+
+            if self.span is not None:
+                self.span.remove()
+            
+            self.span = self.canvas.ax.axvspan(
+                t0, 
+                t1, 
                 color="orange",
                 alpha=0.25,
                 zorder=0
@@ -194,10 +203,10 @@ class MainAppWindow(QMainWindow):
     def Result_insert_and_record(self):
         df_result = pd.DataFrame({"Datetime": self.x_live, "Oven Tempture": self.y_live, "Oven Status": self.oven_status})
         df_result_filtered = df_result["Oven Status"] == "Heated"
-        print(df_result_filtered)
+        # print(df_result_filtered)
 
         Qtable_df = self.qtable_to_df(self.TableWidget)
-        print(Qtable_df)
+        # print(Qtable_df)
         
         datetimestart = df_result["Datetime"].iloc[0].strftime("%Y-%m-%d_%H-%M-%S")
         datetimeend = df_result["Datetime"].iloc[-1].strftime("%Y-%m-%d_%H-%M-%S")        
@@ -221,7 +230,7 @@ class MainAppWindow(QMainWindow):
         old_filename = None
         for idx, row in Qtable_df.iterrows():
             serial = row["Serial Number"]
-            print("serial:\t", serial)
+            # print("serial:\t", serial)
             pn = row["Part Number"]
             opn = row["Operation"]
             product = row["Product Model"]
@@ -234,31 +243,34 @@ class MainAppWindow(QMainWindow):
             print("===============================================================")
             
             df_fits = {
-                "EN": en,
-                "MC": pcname,
-                "PN": pn,
-                "SN OB": serial,
-                "Machine": mc_oven,
-                "Temp target (°C)": self.temp_target,
-                "Time target (minute)": self.hold_seconds/60,
-                "Start time": datetimestart,
-                "End time": datetimeend,
-                "Result (Graph)": img_filename,
-                "Result (csv file)": csv_filename, 
+                "EN": str(en),
+                "MC": str(pcname),
+                "PN": str(pn),
+                "SN OB": str(serial),
+                "Machine": str(mc_oven),
+                "Temp target (°C)": str(self.temp_target),
+                "Time target (minute)": str(int(self.hold_seconds/60)),
+                "Start time": str(datetimestart),
+                "End time": str(datetimeend),
+                "Result (Graph)": repr(img_filename),
+                "Result (csv file)": repr(csv_filename), 
                 "Result": "PASS"
             }
 
-            parameters = ";".join(df_fits.keys())
-            values = ";".join(df_fits.values())
+            parameters = ",".join(df_fits.keys())
+            values = ",".join(df_fits.values())
             log_status = fn_Log(product, opn, parameters, values)
-            if log_status:
+            if log_status == True:
                 old_filename = new_filename
                 os.rename(old_filename, csv_filename)
+                print(f"Serial: {serial} FITs Completed")
             else:
+                print(f"Serial: {serial} FITs not Complete")
                 QMessageBox.critical(self, "FITs insert failed", "Please conact EXT:7763 Atthaphanp")
         self.Oven_Status.setText("Idle")
         self.Oven_Status.setStyleSheet("background-color: rgb(170, 255, 127); color black; font-weight: bold;")
         self.TableWidget.setRowCount(0)
+        print("===============================================================")
         QMessageBox.information(self, "Finish Oven Record", "Please remove unit out of oven")
 
     def reset_run(self):
@@ -274,15 +286,14 @@ class MainAppWindow(QMainWindow):
         self.y_live.clear()
         self.oven_status.clear()
 
-        # if self.trigger_region is not None:
-        #     self.trigger_region.remove()
-        #     self.trigger_region = None
-
         self.canvas.ax.clear()
         self.canvas.ax.set_title("Oven Temperature")
         self.canvas.ax.set_xlabel("Time (H:M:S)")
         self.canvas.ax.set_ylabel("Temperature (°C)")
         self.canvas.ax.grid(True)
+        self.canvas.ax.xaxis.set_major_formatter(
+            mdates.DateFormatter("%H:%M:%S")
+            )
         self.line, = self.canvas.ax.plot([], [], color= "black")
         self.canvas.draw_idle()
 

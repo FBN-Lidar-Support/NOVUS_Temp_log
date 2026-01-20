@@ -4,10 +4,6 @@ import glob
 import re
 import os
 
-def Convert_Data(array_value):
-    pack_value = ";".join(array_value)
-    return pack_value
-
 def fn_Handshake(model : str, operation : str, serial : str):
     print("fn_Handshake")
     lib = Dispatch("FITSDLL.clsDB")
@@ -35,11 +31,11 @@ def fn_Log(model : str, operation : str, parameters : str, values : str):
     else:
         list_parameters["Shift"] = "NIGHT"
     list_parameters["MC"] = os.environ['COMPUTERNAME']
-    parameters = parameters + ";" + "Shift" + ";" + "MC"
-    values =  values + ";" + list_parameters["Shift"] + ";" + list_parameters["MC"]
+    parameters = parameters + "," + "Shift" + "," + "MC"
+    values =  values + "," + list_parameters["Shift"] + "," + list_parameters["MC"]
     fn_initDB = lib.fn_InitDB(f"{model}",f"{operation}","2.90","dbInnoviz")
     if fn_initDB == "True":
-        fn_log = lib.fn_Log(f"{model}",f"{operation}","2.90",f"{parameters}",f"{values}",";")
+        fn_log = lib.fn_Log(f"{model}",f"{operation}","2.90",f"{parameters}",f"{values}",",")
         if fn_log == "True":
             lib.closeDB()
             return True
@@ -56,12 +52,12 @@ def fn_Query(model : str, operation : str, serial : str, query_parameters : str)
 
     fn_initDB = lib.fn_InitDB(f"{model}",f"{operation}","2.90","dbInnoviz")
     if fn_initDB == "True":
-        for param in query_parameters.split(';'):
-            fn_query = lib.fn_Query(f"{model}",f"{operation}","2.90",f"{serial}",f"{param}",";")
+        for param in query_parameters.split(','):
+            fn_query = lib.fn_Query(f"{model}",f"{operation}","2.90",f"{serial}",f"{param}",",")
             fn_query = str(fn_query)
-            query_values = fn_query.replace("-;","").replace(";-","").replace("-","")
+            query_values = fn_query.replace("-,","").replace(",-","").replace("-","")
             query_array.append(query_values)
-        query_result = ";".join(query_array)
+        query_result = ",".join(query_array)
         lib.closeDB()
         return query_result
     else:
@@ -95,9 +91,9 @@ def fn_FitsDebugging():
 
     return output
 
-# parameters = "Run Mode;EN;Time Stamp;Product Type;SN;Program name;Presence Flexures Screws;Score Flexures Screws;Image Flexures Screws;Presence Board Screws;Score Board Screws;Image Board Screws;Presence 2 O-rings;Score 2 O-rings;Image 2 O-rings;Result"
-# values = "Production;524161;2025-07-01 13:28:06;Long Range (LR);CIN251130000;AOI DB to Optical Bench Screws O-ring;PASS;0000100;D:\IV3\Log\CIN251130000_01-07-2025_13-27-54\CIN251130000_00009_001_OK_Jul012025_132612.jpeg;PASS;0000100;D:\IV3\Log\CIN251130000_01-07-2025_13-27-54\CIN251130000_00010_002_OK_Jul012025_132615.jpeg;PASS;0000096;D:\IV3\Log\CIN251130000_01-07-2025_13-27-54\CIN251130000_00005_001_OK_Jul012025_132707.jpeg;PASS"
-# a = fn_Log("OB assy", "OB130", parameters, values)
+# parameters = "EN,MC,PN,SN,Machine,Temp target (°C),Time target (minute),Start time,End time,Result (Graph),Result (csv file),Result,Shift"
+# values = "524161,NOTE-DELL5588,TEST,COBTESTOB240,MC,25,10.0,2026-01-20_08-50-24,2026-01-20_09-00-24,C:\\Projects\\novus_Temp_log\\Log\\Plot_Oven_2026-01-20_09-00-24.jpg,C:\Projects\novus_Temp_log\Log\MC_2026-01-20_09-00-24.csv,PASS,DAY"
+# a = fn_Log("OB assy", "OB240", parameters, values)
 # print(a)
 # print(fn_Handshake("*", "IN260", "CIN254300296"))
 
