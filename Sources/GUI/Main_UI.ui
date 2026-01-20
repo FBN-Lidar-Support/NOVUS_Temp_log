@@ -285,6 +285,11 @@
              <string>80 °C</string>
             </property>
            </item>
+           <item>
+            <property name="text">
+             <string>25 °C</string>
+            </property>
+           </item>
           </widget>
          </item>
          <item row="9" column="1">

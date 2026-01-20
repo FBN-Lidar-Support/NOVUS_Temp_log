@@ -114,7 +114,7 @@ class MainAppWindow(QMainWindow):
                     self.hold_seconds = int(self.Duration.currentText().split("(")[1].split("sec)")[0])
                     self.timer = QTimer(self)
                     self.timer.timeout.connect(self.update_graph)
-                    self.timer.start(100) # 30 sec per point
+                    self.timer.start(10000) # 30 sec per point
                 else:
                     QMessageBox.warning(self, "Start denied", """Please Press button "Add serial" to add serial before press start""")
             else:
@@ -130,6 +130,9 @@ class MainAppWindow(QMainWindow):
             serial, okPressed = QInputDialog.getText(self, "Insert Serial", "Please Insert serial:")
             if okPressed and serial:
                 query = fn_Query("*", "*", serial, "#next_opn;#SHIPDATE;#Part_No;#product").split(";")
+                print(query)
+                if query == [''] or query == ['None'] :
+                    continue
                 next_opn = query[0]
                 shipdate = query[1]
                 part_no = query[2]
