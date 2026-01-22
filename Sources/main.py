@@ -129,7 +129,7 @@ class MainAppWindow(QMainWindow):
             self.hold_seconds = int(self.Duration.currentText().split("(")[1].split("sec)")[0])
             serial, okPressed = QInputDialog.getText(self, "Insert Serial", "Please Insert serial:")
             if okPressed and serial:
-                query = fn_Query("*", "*", serial, "#next_opn;#SHIPDATE;#Part_No;#product").split(";")
+                query = fn_Query("*", "*", serial, "#NEXT_OPN,#SHIPDATE,#Part_No,#product").split(",")
                 print(query)
                 if query == [''] or query == ['None'] :
                     continue
@@ -138,7 +138,7 @@ class MainAppWindow(QMainWindow):
                 part_no = query[2]
                 product = query[3]
                 opn_list = self.config["Operation Config"].get(f"{self.temp_target}-{self.hold_seconds}", "").split(",")
-                if next_opn and not shipdate:
+                if shipdate == "":
                     if next_opn in opn_list:
                         row = self.TableWidget.rowCount()
                         self.TableWidget.insertRow(row)
@@ -147,15 +147,15 @@ class MainAppWindow(QMainWindow):
                         self.TableWidget.setItem(row, 2, QTableWidgetItem(product))
                         self.TableWidget.setItem(row, 3, QTableWidgetItem(next_opn))
                     else:
-                        QMessageBox.critical(self, f"Serial {serial} can not oven on this setting")
+                        QMessageBox.critical(self, "FITS ERROR", f"Serial {serial} can not oven on this setting")
                 elif query[1]:
-                    QMessageBox.critical(self, f"Serial {serial} has already shiped on {shipdate}")
+                    QMessageBox.critical(self, "FITS ERROR", f"Serial {serial} has already shiped on {shipdate}")
                     continue
             else:
                 cancal = True
 
     def update_graph(self):
-        now, status, temp = read_temp("COM4", 1)
+        now, status, temp = read_temp("COM5", 1)
         # ----- live plot -----
         self.x_live.append(now)
         self.y_live.append(temp)
@@ -205,7 +205,7 @@ class MainAppWindow(QMainWindow):
 
     def Result_insert_and_record(self):
         df_result = pd.DataFrame({"Datetime": self.x_live, "Oven Tempture": self.y_live, "Oven Status": self.oven_status})
-        df_result_filtered = df_result["Oven Status"] == "Heated"
+        # df_result_filtered = df_result["Oven Status"] == "Heated"
         # print(df_result_filtered)
 
         Qtable_df = self.qtable_to_df(self.TableWidget)
@@ -244,11 +244,11 @@ class MainAppWindow(QMainWindow):
             if old_csv_filename:
                 os.rename(old_csv_filename, new_csv_filename)
             else:
-                os.rename(csv_filename, new_csv_filename)
+                os.rename(new_csv_filename, csv_filename)
             if old_img_filename:
                 os.rename(old_img_filename, new_img_filename)
             else:
-                os.rename(img_filename, new_img_filename)   
+                os.rename(new_img_filename, img_filename)   
             print("===============================================================")
             df_fits = {
                 "EN": str(en),

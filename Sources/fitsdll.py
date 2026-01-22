@@ -100,7 +100,7 @@ def fn_FitsDebugging():
 
 # # lib = Dispatch("FITSDLL.clsDB")
 # # print(dir(lib))
-# print(fn_Query("*", "*", "CIN254300296", "#NEXT_OPN"))
+# print(fn_Query("*", "*", "COB260400033", "#NEXT_OPN"))
 
 # x = "C:\Projects\novus_Temp_log\Log\COBTESTOB240Plot_Oven_2026-01-22_13-38-02.jpg"
 # print(repr(x).replace("'", ""))
