@@ -36,6 +36,7 @@ def fn_Log(model : str, operation : str, parameters : str, values : str):
     fn_initDB = lib.fn_InitDB(f"{model}",f"{operation}","2.90","dbInnoviz")
     if fn_initDB == "True":
         fn_log = lib.fn_Log(f"{model}",f"{operation}","2.90",f"{parameters}",f"{values}",",")
+        print(fn_log)
         if fn_log == "True":
             lib.closeDB()
             return True
@@ -92,7 +93,7 @@ def fn_FitsDebugging():
     return output
 
 # parameters = "EN,MC,PN,SN,Machine,Temp target (°C),Time target (minute),Start time,End time,Result (Graph),Result (csv file),Result,Shift"
-# values = "524161,NOTE-DELL5588,TEST,COBTESTOB240,MC,25,10.0,2026-01-20_08-50-24,2026-01-20_09-00-24,C:\\Projects\\novus_Temp_log\\Log\\Plot_Oven_2026-01-20_09-00-24.jpg,C:\Projects\novus_Temp_log\Log\MC_2026-01-20_09-00-24.csv,PASS,DAY"
+# values = "524161,NOTE-DELL5588,TEST,COBTESTOB240,MC,25,1,2026-01-22_14-07-15,2026-01-22_14-08-15,C:\\Projects\\novus_Temp_log\\Log\\Plot_Oven_2026-01-22_14-08-15.jpg,C:\\Projects\\novus_Temp_log\\Log\\MC_2026-01-22_14-08-15.csv,PASS,DAYs"
 # a = fn_Log("OB assy", "OB240", parameters, values)
 # print(a)
 # print(fn_Handshake("*", "IN260", "CIN254300296"))
@@ -100,3 +101,6 @@ def fn_FitsDebugging():
 # # lib = Dispatch("FITSDLL.clsDB")
 # # print(dir(lib))
 # print(fn_Query("*", "*", "CIN254300296", "#NEXT_OPN"))
+
+# x = "C:\Projects\novus_Temp_log\Log\COBTESTOB240Plot_Oven_2026-01-22_13-38-02.jpg"
+# print(repr(x).replace("'", ""))

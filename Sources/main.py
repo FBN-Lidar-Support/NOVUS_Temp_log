@@ -190,7 +190,7 @@ class MainAppWindow(QMainWindow):
         # ----- countdown -----
         if self.stop_time is not None:
             remaining = int((self.stop_time - now).total_seconds())
-            self.TimeLeftLabel.setText(f"{max(0, remaining)}s")
+            self.TimeLeftLabel.setText(f"{max(0, remaining)} sec.")
             if now >= self.stop_time:
                 self.timer.stop()
                 self.TimeLeftLabel.setText("Done")
@@ -230,50 +230,66 @@ class MainAppWindow(QMainWindow):
         
         pcname = os.environ['COMPUTERNAME']
 
-        old_filename = None
+        old_csv_filename = None
+        old_img_filename = None
+        
         for idx, row in Qtable_df.iterrows():
             serial = row["Serial Number"]
             # print("serial:\t", serial)
             pn = row["Part Number"]
             opn = row["Operation"]
             product = row["Product Model"]
-            new_filename = os.path.join(self.LogPath, serial + os.path.basename(csv_filename))
-            print(new_filename)
-            if old_filename:
-                os.rename(old_filename, new_filename)
+            new_csv_filename = os.path.join(self.LogPath, serial + os.path.basename(csv_filename))
+            new_img_filename = os.path.join(self.LogPath, serial + os.path.basename(img_filename))
+            if old_csv_filename:
+                os.rename(old_csv_filename, new_csv_filename)
             else:
-                os.rename(csv_filename, new_filename)
+                os.rename(csv_filename, new_csv_filename)
+            if old_img_filename:
+                os.rename(old_img_filename, new_img_filename)
+            else:
+                os.rename(img_filename, new_img_filename)   
             print("===============================================================")
-            
             df_fits = {
                 "EN": str(en),
                 "MC": str(pcname),
                 "PN": str(pn),
-                "SN OB": str(serial),
+                "SN": str(serial),
                 "Machine": str(mc_oven),
                 "Temp target (°C)": str(self.temp_target),
                 "Time target (minute)": str(int(self.hold_seconds/60)),
                 "Start time": str(datetimestart),
                 "End time": str(datetimeend),
-                "Result (Graph)": repr(img_filename),
-                "Result (csv file)": repr(csv_filename), 
+                "Result (Graph)": new_img_filename,
+                "Result (csv file)": new_csv_filename,
                 "Result": "PASS"
             }
 
             parameters = ",".join(df_fits.keys())
             values = ",".join(df_fits.values())
+            print("parameters:\t", parameters)
+            print("values:\t", values)
+
+            for i in range(3):
+                if os.path.exists(new_csv_filename) and os.path.exists(new_img_filename):
+                    break
+                i=+1
+
             log_status = fn_Log(product, opn, parameters, values)
             if log_status == True:
-                old_filename = new_filename
-                os.rename(old_filename, csv_filename)
                 print(f"Serial: {serial} FITs Completed")
             else:
                 print(f"Serial: {serial} FITs not Complete")
-                QMessageBox.critical(self, "FITs insert failed", "Please conact EXT:7763 Atthaphanp")
+                print(log_status)
+                QMessageBox.critical(self, "FITs insert failed", f"Please conact EXT:7763 Atthaphanp\n{log_status}")
         self.Oven_Status.setText("Idle")
         self.Oven_Status.setStyleSheet("background-color: rgb(170, 255, 127); color black; font-weight: bold;")
         self.TableWidget.setRowCount(0)
         print("===============================================================")
+        old_cvs_filename = new_csv_filename
+        os.rename(old_cvs_filename, csv_filename)
+        old_img_filename = new_img_filename
+        os.rename(old_img_filename, img_filename)
         QMessageBox.information(self, "Finish Oven Record", "Please remove unit out of oven")
 
     def reset_run(self):

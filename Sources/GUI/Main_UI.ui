@@ -272,7 +272,7 @@
            </property>
            <item>
             <property name="text">
-             <string>150 °C</string>
+             <string>80 °C</string>
             </property>
            </item>
            <item>
@@ -282,12 +282,7 @@
            </item>
            <item>
             <property name="text">
-             <string>80 °C</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>25 °C</string>
+             <string>150 °C</string>
             </property>
            </item>
           </widget>
@@ -415,12 +410,12 @@
            </property>
            <item>
             <property name="text">
-             <string>10 Mins (600 sec)</string>
+             <string>1 Hour (3600 sec)</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>1 Hour (3600 sec)</string>
+             <string>10 Mins (600 sec)</string>
             </property>
            </item>
           </widget>

@@ -37,8 +37,8 @@ def read_TempAll(com: str):
 #     try: 
 #         temp_value = read_temp("COM4",1)
 #         # temp_value = read_TempAll("COM4")
-#         # print(temp_value[2])
-#         # print(temp_value[0])
+#         print(temp_value[2])
+#         print(temp_value[0])
 #         time.sleep(1)
 #     except KeyboardInterrupt:
 #         quit()
