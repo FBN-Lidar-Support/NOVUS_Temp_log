@@ -40,6 +40,7 @@ class MainAppWindow(QMainWindow):
         try:
             self.config.read(r"C:\Projects\novus_Temp_log\Properties\Config.ini")
             self.LogPath = self.config["DEFAULT"].get("LogPath", "")
+            self.comport = self.config["DEFAULT"].get("datalog_comport", "").upper()
         except Exception as e:
             QMessageBox.critical(None, "Close Program", f"{e}\nPlease check config.ini")
             self.exit_confirm_enabled = False
@@ -155,7 +156,7 @@ class MainAppWindow(QMainWindow):
                 cancal = True
 
     def update_graph(self):
-        now, status, temp = read_temp("COM5", 1)
+        now, status, temp = read_temp(self.comport, 1)
         # ----- live plot -----
         self.x_live.append(now)
         self.y_live.append(temp)
