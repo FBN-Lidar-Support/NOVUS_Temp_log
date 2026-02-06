@@ -128,7 +128,6 @@ class MainAppWindow(QMainWindow):
 
     def Add_Serials(self):
         cancal = False
-        self.serial_list = []
         while not cancal:
             self.temp_target = int(self.Target.currentText().split("°C")[0])
             self.hold_seconds = int(self.Duration.currentText().split("(")[1].split("sec)")[0])
