@@ -115,6 +115,7 @@ class MainAppWindow(QMainWindow):
                     self.Oven_Status.setStyleSheet("background-color: orange; color black; font-weight: bold;")
                     self.temp_target = int(self.Target.currentText().split("°C")[0])
                     self.hold_seconds = int(self.Duration.currentText().split("(")[1].split("sec)")[0])
+                    self.QuitButton.setEnabled(False)
                     self.timer = QTimer(self)
                     self.timer.timeout.connect(self.update_graph)
                     self.timer.start(10000) # 30 sec per point
@@ -133,12 +134,17 @@ class MainAppWindow(QMainWindow):
             self.hold_seconds = int(self.Duration.currentText().split("(")[1].split("sec)")[0])
             serial, okPressed = QInputDialog.getText(self, "Insert Serial", "Please Insert serial:")
             if okPressed and serial:
+<<<<<<< HEAD
                 if serial in self.serial_list:
                     QMessageBox(self, "Duplicate Serial", f"Serial: {serial} already registered")
                     continue
                 query = fn_Query("*", "*", serial, "#NEXT_OPN,#SHIPDATE,#Part_No,#product").split(",")
+=======
+                query = fn_Query("*", "*", serial, "#next_opn,#SHIPDATE,#Part_No,#product").split(",")
+                print("query")
+>>>>>>> 811310fc6372f0b78f8f95d987870b5edac6e313
                 print(query)
-                if query == [''] or query == ['None'] :
+                if query == [''] or query == ['None']:
                     continue
                 next_opn = query[0]
                 shipdate = query[1]
@@ -197,8 +203,11 @@ class MainAppWindow(QMainWindow):
 
         # ----- countdown -----
         if self.stop_time is not None:
-            remaining = int((self.stop_time - now).total_seconds())
-            self.TimeLeftLabel.setText(f"{max(0, remaining)} sec.")
+            remaining = int((self.stop_time - now).total_seconds() / 60)
+            if remaining > 1:
+                self.TimeLeftLabel.setText(f"{max(0, remaining)} mins.")
+            else:
+                self.TimeLeftLabel.setText("< 1 mins.")
             if now >= self.stop_time:
                 self.timer.stop()
                 self.TimeLeftLabel.setText("Done")
@@ -232,7 +241,7 @@ class MainAppWindow(QMainWindow):
             return
         
         mc_oven = self.Oven_ID.text().strip()
-        csv_filename = os.path.join(self.LogPath, f"{mc_oven}_{datetimeend}.csv")
+        csv_filename = os.path.join(self.LogPath, f"_ORA{mc_oven}_{datetimeend}.csv")
         df_result.to_csv(csv_filename, index=False)
         en = self.EN_Value.text().strip()
         
@@ -249,14 +258,15 @@ class MainAppWindow(QMainWindow):
             product = row["Product Model"]
             new_csv_filename = os.path.join(self.LogPath, serial + os.path.basename(csv_filename))
             new_img_filename = os.path.join(self.LogPath, serial + os.path.basename(img_filename))
-            if old_csv_filename:
+            if not old_csv_filename:
+                os.rename(csv_filename, new_csv_filename)
+            else:
                 os.rename(old_csv_filename, new_csv_filename)
+
+            if not old_img_filename:
+                os.rename(img_filename, new_img_filename)
             else:
-                os.rename(new_csv_filename, csv_filename)
-            if old_img_filename:
-                os.rename(old_img_filename, new_img_filename)
-            else:
-                os.rename(new_img_filename, img_filename)   
+                os.rename(old_img_filename, new_img_filename)   
             print("===============================================================")
             df_fits = {
                 "EN": str(en),
@@ -275,13 +285,13 @@ class MainAppWindow(QMainWindow):
 
             parameters = ",".join(df_fits.keys())
             values = ",".join(df_fits.values())
-            print("parameters:\t", parameters)
-            print("values:\t", values)
+            # print("parameters:\t", parameters)
+            # print("values:\t", values)
 
-            for i in range(3):
-                if os.path.exists(new_csv_filename) and os.path.exists(new_img_filename):
-                    break
-                i=+1
+            # for i in range(3):
+            #     if os.path.exists(new_csv_filename) and os.path.exists(new_img_filename):
+            #         break
+            #     i=+1
 
             log_status = fn_Log(product, opn, parameters, values)
             if log_status == True:
@@ -290,15 +300,18 @@ class MainAppWindow(QMainWindow):
                 print(f"Serial: {serial} FITs not Complete")
                 print(log_status)
                 QMessageBox.critical(self, "FITs insert failed", f"Please conact EXT:7763 Atthaphanp\n{log_status}")
+            old_csv_filename = new_csv_filename
+            old_img_filename = new_img_filename
+            
         self.Oven_Status.setText("Idle")
         self.Oven_Status.setStyleSheet("background-color: rgb(170, 255, 127); color black; font-weight: bold;")
         self.TableWidget.setRowCount(0)
         print("===============================================================")
-        old_cvs_filename = new_csv_filename
-        os.rename(old_cvs_filename, csv_filename)
-        old_img_filename = new_img_filename
+        os.rename(old_csv_filename, csv_filename)
+        
         os.rename(old_img_filename, img_filename)
         QMessageBox.information(self, "Finish Oven Record", "Please remove unit out of oven")
+        self.QuitButton.setEnabled(True)
 
     def reset_run(self):
         self.trigger_time = None
@@ -367,5 +380,5 @@ if __name__ == "__main__":
     # QApplication.setAttribute(Qt.AA_DontCreateNativeWidgetSiblings, True)
     app = QApplication(sys.argv)
     main_window = MainAppWindow()
-    main_window.showMaximized()
+    main_window.showFullScreen()
     sys.exit(app.exec())
