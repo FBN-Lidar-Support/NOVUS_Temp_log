@@ -134,15 +134,10 @@ class MainAppWindow(QMainWindow):
             self.hold_seconds = int(self.Duration.currentText().split("(")[1].split("sec)")[0])
             serial, okPressed = QInputDialog.getText(self, "Insert Serial", "Please Insert serial:")
             if okPressed and serial:
-<<<<<<< HEAD
                 if serial in self.serial_list:
                     QMessageBox(self, "Duplicate Serial", f"Serial: {serial} already registered")
                     continue
                 query = fn_Query("*", "*", serial, "#NEXT_OPN,#SHIPDATE,#Part_No,#product").split(",")
-=======
-                query = fn_Query("*", "*", serial, "#next_opn,#SHIPDATE,#Part_No,#product").split(",")
-                print("query")
->>>>>>> 811310fc6372f0b78f8f95d987870b5edac6e313
                 print(query)
                 if query == [''] or query == ['None']:
                     continue
