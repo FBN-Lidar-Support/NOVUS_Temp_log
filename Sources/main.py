@@ -85,6 +85,8 @@ class MainAppWindow(QMainWindow):
         self.triggered = False
         self.span = None
 
+        self.serial_list = []
+
         # self.max_points = 600 
         # self.x_live = deque(maxlen=self.max_points)
         # self.y_live = deque(maxlen=self.max_points)
@@ -125,11 +127,15 @@ class MainAppWindow(QMainWindow):
 
     def Add_Serials(self):
         cancal = False
+        self.serial_list = []
         while not cancal:
             self.temp_target = int(self.Target.currentText().split("°C")[0])
             self.hold_seconds = int(self.Duration.currentText().split("(")[1].split("sec)")[0])
             serial, okPressed = QInputDialog.getText(self, "Insert Serial", "Please Insert serial:")
             if okPressed and serial:
+                if serial in self.serial_list:
+                    QMessageBox(self, "Duplicate Serial", f"Serial: {serial} already registered")
+                    continue
                 query = fn_Query("*", "*", serial, "#NEXT_OPN,#SHIPDATE,#Part_No,#product").split(",")
                 print(query)
                 if query == [''] or query == ['None'] :
@@ -141,6 +147,7 @@ class MainAppWindow(QMainWindow):
                 opn_list = self.config["Operation Config"].get(f"{self.temp_target}-{self.hold_seconds}", "").split(",")
                 if shipdate == "":
                     if next_opn in opn_list:
+                        self.serial_list.append(serial)
                         row = self.TableWidget.rowCount()
                         self.TableWidget.insertRow(row)
                         self.TableWidget.setItem(row, 0, QTableWidgetItem(serial))
@@ -301,6 +308,7 @@ class MainAppWindow(QMainWindow):
         self.temp_target = None
         self.hold_seconds = None
 
+        self.serial_list.clear()
 
         self.x_live.clear()
         self.y_live.clear()
