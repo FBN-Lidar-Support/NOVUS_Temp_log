@@ -41,6 +41,7 @@ class MainAppWindow(QMainWindow):
             self.config.read(r"C:\Projects\novus_Temp_log\Properties\Config.ini")
             self.LogPath = self.config["DEFAULT"].get("LogPath", "")
             self.comport = self.config["DEFAULT"].get("datalog_comport", "").upper()
+            self.tick_speed = self.config["DEFAULT"].getint("tick_speed", 1)
         except Exception as e:
             QMessageBox.critical(None, "Close Program", f"{e}\nPlease check config.ini")
             self.exit_confirm_enabled = False
@@ -118,7 +119,7 @@ class MainAppWindow(QMainWindow):
                     self.QuitButton.setEnabled(False)
                     self.timer = QTimer(self)
                     self.timer.timeout.connect(self.update_graph)
-                    self.timer.start(10000) # 30 sec per point
+                    self.timer.start((self.tick_speed * 1000)) # read temp speed per point
                 else:
                     QMessageBox.warning(self, "Start denied", """Please Press button "Add serial" to add serial before press start""")
             else:
