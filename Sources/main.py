@@ -225,7 +225,7 @@ class MainAppWindow(QMainWindow):
         datetimestart = df_result["Datetime"].iloc[0].strftime("%Y-%m-%d_%H-%M-%S")
         datetimeend = df_result["Datetime"].iloc[-1].strftime("%Y-%m-%d_%H-%M-%S")        
 
-        img_filename = os.path.join(self.LogPath, f"Plot_Oven_{datetimeend}.jpg")
+        img_filename = os.path.join(self.LogPath, f"_{{OPN}}_Plot_Oven_{datetimeend}.jpg")
         self.canvas.save_image(img_filename)
         time.sleep(0.5)
         if os.path.exists(img_filename):
@@ -235,7 +235,7 @@ class MainAppWindow(QMainWindow):
             return
         
         mc_oven = self.Oven_ID.text().strip()
-        csv_filename = os.path.join(self.LogPath, f"_ORA{mc_oven}_{datetimeend}.csv")
+        csv_filename = os.path.join(self.LogPath, f"_{{OPN}}_ORA{mc_oven}_{datetimeend}.csv")
         df_result.to_csv(csv_filename, index=False)
         en = self.EN_Value.text().strip()
         
