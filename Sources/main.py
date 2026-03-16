@@ -12,7 +12,8 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 import matplotlib.dates as mdates
 
 from novus import read_temp
-from fitsdll import fn_Handshake, fn_Query, fn_Log
+# from fitsdll import fn_Handshake, fn_Query, fn_Log
+from webservice import FITS_Web_Serivce
 
 # Matplotlib canvas class to create figure
 class MplCanvas(Canvas):
@@ -45,6 +46,11 @@ class MainAppWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(None, "Close Program", f"{e}\nPlease check config.ini")
             self.exit_confirm_enabled = False
+            quit()
+
+        self.fits = FITS_Web_Serivce()
+        if self.fits.getStatusURL() != "OK":
+            QMessageBox(self, "FITS Connection Failed", "Please check internet connnection to connect to Fabrinet server.")
             quit()
 
         if not os.path.exists(self.LogPath):
@@ -137,7 +143,8 @@ class MainAppWindow(QMainWindow):
                 if serial in self.serial_list:
                     QMessageBox(self, "Duplicate Serial", f"Serial: {serial} already registered")
                     continue
-                query = fn_Query("*", "*", serial, "#NEXT_OPN,#SHIPDATE,#Part_No,#product").split(",")
+                query = self.fits.FIT_Query("*", "*", serial, "#NEXT_OPN,#SHIPDATE,#Part_No,#product").split(",")
+                # query = fn_Query("*", "*", serial, "#NEXT_OPN,#SHIPDATE,#Part_No,#product").split(",")
                 print(query)
                 if query == [''] or query == ['None']:
                     continue
@@ -287,8 +294,8 @@ class MainAppWindow(QMainWindow):
             #     if os.path.exists(new_csv_filename) and os.path.exists(new_img_filename):
             #         break
             #     i=+1
-
-            log_status = fn_Log(product, opn, parameters, values)
+            log_status = self.fits.FIT_Log(product, opn, parameters, values)
+            # log_status = fn_Log(product, opn, parameters, values)
             if log_status == True:
                 print(f"Serial: {serial} FITs Completed")
             else:
