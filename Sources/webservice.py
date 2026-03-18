@@ -1,10 +1,9 @@
 import os
 import requests
 from xml.dom.minidom import parseString
-import pytz
-import dateutil.parser
 import urllib.request
 from datetime import datetime
+
 class FITS_Web_Serivce():
     def __init__(self):
         self.url = "https://service.fabrinet.co.th/FBNFITSService/FBNFITSServices.svc?wsdl"
@@ -79,8 +78,8 @@ class FITS_Web_Serivce():
         response = requests.request("POST", self.url, headers=headers, data=xml_soap)
         # print(response.text)
         aResult = FITS_Web_Serivce.query_fit_response(response.text)
-        aResult = str(aResult).split(':', 1)[1]
-        return aResult
+        aResult = [i.split(':', 1)[-1] for i in aResult.strip().split(",")]
+        return ",".join(aResult)
 
     def FIT_Log(self, model: str, station_no: str, Param: str, value: str):
         start_day_shift = datetime.strptime("07:00","%H:%M").time()
@@ -91,7 +90,7 @@ class FITS_Web_Serivce():
             value = value + "," + "DAY"
         else:
             value = value + "," + "NIGHT"
-
+            
         xml_fn_log = """<?xml version='1.0'?>
             <x:Envelope
                 xmlns:x="http://schemas.xmlsoap.org/soap/envelope/"
@@ -126,7 +125,7 @@ class FITS_Web_Serivce():
         if FIT_result.upper() == "TRUE" or FIT_result.upper() == "OK":
             return True
         else:
-            raise Exception("FIT ERROR = " + FITS_Web_Serivce.query_fit_response(response.text))
+            return FITS_Web_Serivce.query_fit_response(response.text)
         
     def query_fit_response(xml_str: str):
         dom = parseString(xml_str)
@@ -137,14 +136,3 @@ class FITS_Web_Serivce():
         dom = parseString(xml_str)
         a = dom.getElementsByTagName("a:Result")
         return str(a[0].firstChild.nodeValue)
-
-# station_no = "IN160"
-# partno = "*"
-# Param = "EN,Shift,MC,SN unit,BN Glue tube,Program name,Fixture jig,Start time,End time,Result"
-# value = "524161,DAY,DELL-5588,CIN250000002,TEST,01,DUMMY,17:00:00,18:00:00,PASS"
-
-# FITs = FITS_Web_Serivce()
-# fn_handcheck = FITs.FIT_Handshake("CIN250000002", "IN160", "*")
-# if fn_handcheck == True:
-#     log = FITs.FIT_IN160_Log(station_no, partno, Param, value)
-#     print(log)
