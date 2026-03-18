@@ -42,7 +42,7 @@ class MainAppWindow(QMainWindow):
             self.config.read(r"C:\Projects\novus_Temp_log\Properties\Config.ini")
             self.LogPath = self.config["DEFAULT"].get("LogPath", "")
             self.comport = self.config["DEFAULT"].get("datalog_comport", "").upper()
-            self.tick_speed = self.config["DEFAULT"].getint("tick_speed", 1)
+            self.tick_speed = self.config["DEFAULT"].getint("tick_speed", 10)
         except Exception as e:
             QMessageBox.critical(None, "Close Program", f"{e}\nPlease check config.ini")
             self.exit_confirm_enabled = False
@@ -153,7 +153,7 @@ class MainAppWindow(QMainWindow):
                 part_no = query[2]
                 product = query[3]
                 opn_list = self.config["Operation Config"].get(f"{self.temp_target}-{self.hold_seconds}", "").split(",")
-                if shipdate == "":
+                if shipdate == "" or shipdate == "-":
                     if next_opn in opn_list:
                         self.serial_list.append(serial)
                         row = self.TableWidget.rowCount()
