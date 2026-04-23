@@ -92,8 +92,8 @@ def fn_FitsDebugging():
 
     return output
 
-# parameters = "EN,MC,PN,SN,Machine,Temp target (°C),Time target (minute),Start time,End time,Result (Graph),Result (csv file),Result,Shift"
-# values = "524161,NOTE-DELL5588,TEST,COBTESTOB240,MC,25,1,2026-01-22_14-07-15,2026-01-22_14-08-15,C:\\Projects\\novus_Temp_log\\Log\\Plot_Oven_2026-01-22_14-08-15.jpg,C:\\Projects\\novus_Temp_log\\Log\\MC_2026-01-22_14-08-15.csv,PASS,DAYs"
+# parameters = "EN,MC,PN,SN,Oven Machine,Temp target (°C),Time target (minute),Start time,End time,Result (Graph),Result (csv file),Result,Shift"
+# values = "524161,NOTE-DELL5588,TEST,COBTESTOB240,MC,25,1,2026-01-22_14-07-15,2026-01-22_14-08-15,C:\Projects\\novus_Temp_log\\Log\\Plot_Oven_2026-02-25_10-52-06 copy.jpg,C:\\Projects\\novus_Temp_log\\Log\\COBTESTOB240_OB240_ORA848066_2026-03-19_11-32-18 copy.csv,PASS,DAYs"
 # a = fn_Log("OB assy", "OB240", parameters, values)
 # print(a)
 # print(fn_Handshake("*", "IN260", "CIN254300296"))

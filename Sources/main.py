@@ -12,8 +12,8 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 import matplotlib.dates as mdates
 
 from novus import read_temp
-# from fitsdll import fn_Handshake, fn_Query, fn_Log
-from webservice import FITS_Web_Serivce
+from fitsdll import fn_Handshake, fn_Query, fn_Log
+# from webservice import FITS_Web_Serivce
 
 # Matplotlib canvas class to create figure
 class MplCanvas(Canvas):
@@ -48,10 +48,10 @@ class MainAppWindow(QMainWindow):
             self.exit_confirm_enabled = False
             quit()
 
-        self.fits = FITS_Web_Serivce()
-        if self.fits.getStatusURL() != "OK":
-            QMessageBox(self, "FITS Connection Failed", "Please check internet connnection to connect to Fabrinet server.")
-            quit()
+        # self.fits = FITS_Web_Serivce()
+        # if self.fits.getStatusURL() != "OK":
+        #     QMessageBox(self, "FITS Connection Failed", "Please check internet connnection to connect to Fabrinet server.")
+        #     quit()
 
         if not os.path.exists(self.LogPath):
             os.makedirs(self.LogPath, exist_ok=True)
@@ -113,6 +113,7 @@ class MainAppWindow(QMainWindow):
         self.AddSNButton.clicked.connect(self.Add_Serials)
 
     def on_start_clicked(self):
+        self.StartButton.setEnabled(False)
         print("start")
         self.reset_run()
         if len(self.EN_Value.text()) == 6:
@@ -143,8 +144,8 @@ class MainAppWindow(QMainWindow):
                 if serial in self.serial_list:
                     QMessageBox(self, "Duplicate Serial", f"Serial: {serial} already registered")
                     continue
-                query = self.fits.FIT_Query("*", "*", serial, "#NEXT_OPN,#SHIPDATE,#Part_No,#product").split(",")
-                # query = fn_Query("*", "*", serial, "#NEXT_OPN,#SHIPDATE,#Part_No,#product").split(",")
+                # query = self.fits.FIT_Query("*", "*", serial, "#NEXT_OPN,#SHIPDATE,#Part_No,#product").split(",")
+                query = fn_Query("*", "*", serial, "#NEXT_OPN,#SHIPDATE,#Part_No,#product").split(",")
                 print(query)
                 if query == [''] or query == ['None']:
                     continue
@@ -223,6 +224,7 @@ class MainAppWindow(QMainWindow):
         self.canvas.draw_idle() # update Graph
 
     def Result_insert_and_record(self):
+        mc_oven = self.Oven_ID.text().strip()
         df_result = pd.DataFrame({"Datetime": self.x_live, "Oven Tempture": self.y_live, "Oven Status": self.oven_status})
         # df_result_filtered = df_result["Oven Status"] == "Heated"
         # print(df_result_filtered)
@@ -233,7 +235,7 @@ class MainAppWindow(QMainWindow):
         datetimestart = df_result["Datetime"].iloc[0].strftime("%Y-%m-%d_%H-%M-%S")
         datetimeend = df_result["Datetime"].iloc[-1].strftime("%Y-%m-%d_%H-%M-%S")        
 
-        img_filename = os.path.join(self.LogPath, f"_{{OPN}}_Plot_Oven_{datetimeend}.jpg")
+        img_filename = os.path.join(self.LogPath, f"_{{OPN}}_ORA{mc_oven}_{datetimeend}.jpg")
         self.canvas.save_image(img_filename)
         time.sleep(0.5)
         if os.path.exists(img_filename):
@@ -242,7 +244,6 @@ class MainAppWindow(QMainWindow):
             QMessageBox.critical(self, "FAIL record fits", "Can not generate image file\nPlease contact Engineer",)
             return
         
-        mc_oven = self.Oven_ID.text().strip()
         csv_filename = os.path.join(self.LogPath, f"_{{OPN}}_ORA{mc_oven}_{datetimeend}.csv")
         df_result.to_csv(csv_filename, index=False)
         en = self.EN_Value.text().strip()
@@ -264,11 +265,14 @@ class MainAppWindow(QMainWindow):
                 os.rename(csv_filename, new_csv_filename)
             else:
                 os.rename(old_csv_filename, new_csv_filename)
-
+            print(new_csv_filename)
+            new_csv_filename = new_csv_filename.replace("\\","\\\\")
             if not old_img_filename:
                 os.rename(img_filename, new_img_filename)
             else:
                 os.rename(old_img_filename, new_img_filename)   
+            print(new_img_filename)
+            new_img_filename = new_img_filename.replace("\\","\\\\")
             print("===============================================================")
             df_fits = {
                 "EN": str(en),
@@ -287,15 +291,9 @@ class MainAppWindow(QMainWindow):
 
             parameters = ",".join(df_fits.keys())
             values = ",".join(df_fits.values())
-            # print("parameters:\t", parameters)
-            # print("values:\t", values)
 
-            # for i in range(3):
-            #     if os.path.exists(new_csv_filename) and os.path.exists(new_img_filename):
-            #         break
-            #     i=+1
-            log_status = self.fits.FIT_Log(product, opn, parameters, values)
-            # log_status = fn_Log(product, opn, parameters, values)
+            # log_status = self.fits.FIT_Log(product, opn, parameters, values)
+            log_status = fn_Log(product, opn, parameters, values)
             if log_status == True:
                 print(f"Serial: {serial} FITs Completed")
             else:
@@ -313,6 +311,7 @@ class MainAppWindow(QMainWindow):
         
         os.rename(old_img_filename, img_filename)
         QMessageBox.information(self, "Finish Oven Record", "Please remove unit out of oven")
+        self.StartButton.setEnabled(True)
         self.QuitButton.setEnabled(True)
 
     def reset_run(self):

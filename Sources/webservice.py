@@ -90,7 +90,9 @@ class FITS_Web_Serivce():
             value = value + "," + "DAY"
         else:
             value = value + "," + "NIGHT"
-            
+        
+        print("parameters:\t", Param)
+        print("values:\t", value)
         xml_fn_log = """<?xml version='1.0'?>
             <x:Envelope
                 xmlns:x="http://schemas.xmlsoap.org/soap/envelope/"
@@ -103,7 +105,7 @@ class FITS_Web_Serivce():
                         <tem:user_password>{pass}</tem:user_password>
                         <tem:model>{PN}</tem:model>
                         <tem:operation>{station}</tem:operation>
-                        <tem:revision>2.4</tem:revision>
+                        <tem:revision>2.90</tem:revision>
                         <tem:parameters>{FIT_Param}</tem:parameters>
                         <tem:values>{result_value}</tem:values>
                         <tem:fsp>,</tem:fsp>
@@ -117,7 +119,7 @@ class FITS_Web_Serivce():
         xml_soap = xml_fn_log.replace("{pro_id}", self.project_id).replace("{user}", self.user_name).replace("{pass}",
                                     self.user_password).replace("{PN}", model).replace("{station}",
                                     station_no).replace("{FIT_Param}", Param).replace("{result_value}", value)  
-        # print(xml_soap)                       
+        print(xml_soap)                       
         response = requests.request("POST", self.url, headers=headers_fn_log, data=xml_soap)
         # print(response.text)
         FIT_result = FITS_Web_Serivce.query_fit_ressult(response.text)

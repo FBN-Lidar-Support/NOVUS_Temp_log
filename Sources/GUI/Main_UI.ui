@@ -351,6 +351,11 @@
              <string>80 °C</string>
             </property>
            </item>
+           <item>
+            <property name="text">
+             <string>30 °C</string>
+            </property>
+           </item>
           </widget>
          </item>
          <item row="9" column="1">
@@ -487,6 +492,11 @@
            <item>
             <property name="text">
              <string>10 Mins (600 sec)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>1 Mins (60 sec)</string>
             </property>
            </item>
           </widget>
