@@ -175,6 +175,7 @@ class MainAppWindow(QMainWindow):
         now, status, temp = read_temp(self.comport, 1)
         # ----- live plot -----
         self.x_live.append(now)
+        # self.y_live.append(temp+0.5)
         self.y_live.append(temp)
 
         x_num = mdates.date2num(list(self.x_live))
