@@ -3,6 +3,7 @@ import sys
 import time
 import pandas as pd
 import configparser
+import pygetwindow as gw
 from datetime import timedelta
 from PyQt6 import uic, QtWidgets
 from PyQt6.QtWidgets import QApplication, QHeaderView, QMainWindow, QInputDialog, QLineEdit, QTableWidget, QTableWidgetItem, QMessageBox
@@ -58,6 +59,24 @@ class MainAppWindow(QMainWindow):
 
         uic.loadUi(r"C:\Projects\novus_Temp_log\Sources\GUI\Main_UI.ui", self)
         self.TableWidget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+
+        comport_list = find_datalog_port()
+        if not comport_list:
+            QMessageBox.critical(self, "Datalog disconnect", "Datalog COMPORT not found\nPlease check USB cable from Data logger to PC")
+            quit()
+            
+        for port in self.comport_list:
+            WINDOW_NAME = f"Auto_TempLog_{port}"
+            
+            windows = gw.getWindowsWithTitle(WINDOW_NAME)
+            if windows:
+                self.setWindowTitle("My Custom App Name")
+                self.COMPORT = port
+                self.comport_value.setText(port)
+                break
+        else:
+            QMessageBox.critical(self, "All window already Running", "All window already Running\nPlease close old window before run new window")
+            quit()
 
         if not os.path.exists(self.LogPath):
             os.makedirs(self.LogPath, exist_ok= True)
@@ -172,7 +191,7 @@ class MainAppWindow(QMainWindow):
                 cancal = True
 
     def update_graph(self):
-        now, status, temp = read_temp(self.comport, 1)fgdfdhfgh
+        now, status, temp = read_temp(self.COMPORT, 1)
         # ----- live plot -----
         self.x_live.append(now)
         # self.y_live.append(temp+0.5)
