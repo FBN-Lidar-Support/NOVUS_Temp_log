@@ -11,7 +11,7 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 import matplotlib.dates as mdates
 
-from novus import read_temp
+from novus import read_temp, find_datalog_port
 from fitsdll import fn_Handshake, fn_Query, fn_Log
 # from webservice import FITS_Web_Serivce
 
@@ -37,11 +37,11 @@ class MainAppWindow(QMainWindow):
         super().__init__()
         os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --disable-software-rasterizer"
         self.allow_close = False
+        self.MC = os.environ.get('COMPUTERNAME')
         self.config = configparser.ConfigParser()
         try:
             self.config.read(r"C:\Projects\novus_Temp_log\Properties\Config.ini")
             self.LogPath = self.config["DEFAULT"].get("LogPath", "")
-            self.comport = self.config["DEFAULT"].get("datalog_comport", "").upper()
             self.tick_speed = self.config["DEFAULT"].getint("tick_speed", 10)
         except Exception as e:
             QMessageBox.critical(None, "Close Program", f"{e}\nPlease check config.ini")
@@ -172,7 +172,7 @@ class MainAppWindow(QMainWindow):
                 cancal = True
 
     def update_graph(self):
-        now, status, temp = read_temp(self.comport, 1)
+        now, status, temp = read_temp(self.comport, 1)fgdfdhfgh
         # ----- live plot -----
         self.x_live.append(now)
         # self.y_live.append(temp+0.5)
@@ -248,8 +248,6 @@ class MainAppWindow(QMainWindow):
         csv_filename = os.path.join(self.LogPath, f"_{{OPN}}_ORA{mc_oven}_{datetimeend}.csv")
         df_result.to_csv(csv_filename, index=False)
         en = self.EN_Value.text().strip()
-        
-        pcname = os.environ['COMPUTERNAME']
 
         old_csv_filename = None
         old_img_filename = None
@@ -277,7 +275,7 @@ class MainAppWindow(QMainWindow):
             print("===============================================================")
             df_fits = {
                 "EN": str(en),
-                "MC": str(pcname),
+                "MC": str(self.MC),
                 "PN": str(pn),
                 "SN": str(serial),
                 "Machine": str(mc_oven),

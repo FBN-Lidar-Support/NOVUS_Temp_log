@@ -1,7 +1,14 @@
 from pymodbus.client import ModbusSerialClient
-import time
+import serial.tools.list_ports
 from datetime import datetime
-import matplotlib.pyplot as plt
+
+def find_datalog_port():
+    port_list = []
+    ports = serial.tools.list_ports.comports()
+    for p in ports:
+        if p.description.startswith('LogBox-WiFi'):
+            port_list.append(p.device)
+    return port_list
 
 def read_temp(comport: str="COM4", channel:int=1): 
     logbox = ModbusSerialClient(port=comport, baudrate=9600, timeout=1)
@@ -43,12 +50,3 @@ def readmuti_temp(comport: str="COM4", channel_list:list=[1, 2, 3]):
     logbox.close()
     # print(f"full return is {result.registers}")
     return log_array
-
-# while True:
-#     try: 
-#         temp_value = readmuti_temp("COM4",1)
-#         # temp_value = read_TempAll("COM4")
-#         print(temp_value)
-#         time.sleep(1)
-#     except KeyboardInterrupt:
-#         quit()
