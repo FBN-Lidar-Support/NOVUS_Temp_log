@@ -39,6 +39,7 @@ class MainAppWindow(QMainWindow):
         os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --disable-software-rasterizer"
         self.allow_close = False
         self.MC = os.environ.get('COMPUTERNAME')
+        print(self.MC)
         self.config = configparser.ConfigParser()
         try:
             self.config.read(r"C:\Projects\novus_Temp_log\Properties\Config.ini")
@@ -60,23 +61,24 @@ class MainAppWindow(QMainWindow):
         uic.loadUi(r"C:\Projects\novus_Temp_log\Sources\GUI\Main_UI.ui", self)
         self.TableWidget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
-        comport_list = find_datalog_port()
-        if not comport_list:
-            QMessageBox.critical(self, "Datalog disconnect", "Datalog COMPORT not found\nPlease check USB cable from Data logger to PC")
-            quit()
-            
-        for port in self.comport_list:
-            WINDOW_NAME = f"Auto_TempLog_{port}"
-            
-            windows = gw.getWindowsWithTitle(WINDOW_NAME)
-            if windows:
-                self.setWindowTitle("My Custom App Name")
-                self.COMPORT = port
-                self.comport_value.setText(port)
-                break
-        else:
-            QMessageBox.critical(self, "All window already Running", "All window already Running\nPlease close old window before run new window")
-            quit()
+        # comport_list = find_datalog_port()
+        # if not comport_list:
+        #     QMessageBox.critical(self, "Datalog disconnect", "Datalog COMPORT not found\nPlease check USB cable from Data logger to PC")
+        #     quit()
+        # print(comport_list)
+        # for port in comport_list:
+        #     WINDOW_NAME = f"Auto_TempLog_{port}"
+        #     windows = gw.getWindowsWithTitle(WINDOW_NAME)
+        
+        #     print(windows)
+        #     if not windows:
+        #         self.setWindowTitle("WINDOW_NAME")
+        #         self.COMPORT = port
+        #         self.comport_value.setText(port)
+        #         break
+        # else:
+        #     QMessageBox.critical(self, "All window already Running", "All window already Running\nPlease close old window before run new window")
+        #     quit()
 
         if not os.path.exists(self.LogPath):
             os.makedirs(self.LogPath, exist_ok= True)
@@ -126,10 +128,37 @@ class MainAppWindow(QMainWindow):
         self.canvas.draw()
         
         self.EN_Value.setFocus()
-        self.EN_Value.returnPressed.connect(self.Oven_ID.setFocus)
         self.QuitButton.clicked.connect(self.on_quit_clicked)
         self.StartButton.clicked.connect(self.on_start_clicked)
         self.AddSNButton.clicked.connect(self.Add_Serials)
+        
+        QTimer.singleShot(100, self.select_ORA)
+
+    def select_ORA(self):
+        ORA_list = list(self.config._sections['CUS-2156-031'].keys())
+        ORA_list = list(map(str.upper, ORA_list))
+        oven_name, ok = QInputDialog.getItem(self,
+                                         "Choose Oven ORA#",
+                                         "Choose Oven:",
+                                         ORA_list,
+                                         0,
+                                         False
+                                         )
+        if not ok:
+            print("Quit Program")
+            quit()
+        port = self.config[self.MC].get(oven_name, "").upper()
+        WINDOW_NAME = f"Auto_TempLog_{port}"        
+        windows = gw.getWindowsWithTitle(WINDOW_NAME)
+        if not windows:
+            self.setWindowTitle(WINDOW_NAME)
+            self.COMPORT = port
+            self.comport_value.setText(port)
+            self.Oven_ID.setText(oven_name)
+            return
+        else:
+            QMessageBox.warning(self, "Oven Occupied", f"{oven_name} already running!\nPlease change Oven")
+            QTimer.singleShot(100, self.select_ORA)
 
     def on_start_clicked(self):
         self.StartButton.setEnabled(False)
