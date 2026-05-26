@@ -542,16 +542,6 @@
              <string>20 Mins (1200 sec)</string>
             </property>
            </item>
-           <item>
-            <property name="text">
-             <string>10 Mins (600 sec)</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>1 Mins (60 sec)</string>
-            </property>
-           </item>
           </widget>
          </item>
          <item row="9" column="0">
@@ -626,11 +616,6 @@
            </property>
            <item>
             <property name="text">
-             <string>150 °C</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
              <string>120 °C</string>
             </property>
            </item>
@@ -642,11 +627,6 @@
            <item>
             <property name="text">
              <string>80 °C</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>30 °C</string>
             </property>
            </item>
           </widget>
