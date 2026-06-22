@@ -137,13 +137,7 @@ class MainAppWindow(QMainWindow):
     def select_ORA(self):
         ORA_list = list(self.config._sections['CUS-2156-031'].keys())
         ORA_list = list(map(str.upper, ORA_list))
-        oven_name, ok = QInputDialog.getItem(self,
-                                         "Choose Oven ORA#",
-                                         "Choose Oven:",
-                                         ORA_list,
-                                         0,
-                                         False
-                                         )
+        oven_name, ok = QInputDialog.getItem(self, "Choose Oven ORA#", "Choose Oven:", ORA_list, 0, False)
         if not ok:
             print("Quit Program")
             quit()
@@ -211,6 +205,23 @@ class MainAppWindow(QMainWindow):
                         self.TableWidget.setItem(row, 1, QTableWidgetItem(part_no))
                         self.TableWidget.setItem(row, 2, QTableWidgetItem(product))
                         self.TableWidget.setItem(row, 3, QTableWidgetItem(next_opn))
+                        if next_opn == "IN323":
+                            target_header = "Weight jig"
+                            baking_col = -1
+                            # เช็คก่อนว่ามี column Baking Clamp อยู่แล้วไหม
+                            for col in range(self.TableWidget.columnCount()):
+                                header_item = self.TableWidget.horizontalHeaderItem(col)
+                                if header_item is not None and header_item.text() == target_header:
+                                    baking_col = col
+                                    break
+                            # ถ้ายังไม่มี ค่อยเพิ่ม column ใหม่
+                            if baking_col == -1:
+                                baking_col = self.TableWidget.columnCount()
+                                self.TableWidget.insertColumn(baking_col)
+                                self.TableWidget.setHorizontalHeaderItem(baking_col, QTableWidgetItem(target_header))
+                            subserial, okPressed = QInputDialog.getText(self, "Scan Weight jig", "Please Insert serial Weight jig:")
+                            if okPressed:
+                                self.TableWidget.setItem(row, baking_col, QTableWidgetItem(subserial))
                     else:
                         QMessageBox.critical(self, "FITS ERROR", f"Serial {serial} can not oven on this setting")
                 elif query[1]:
@@ -306,6 +317,7 @@ class MainAppWindow(QMainWindow):
             pn = row["Part Number"]
             opn = row["Operation"]
             product = row["Product Model"]
+            subserial = row["Weight jig"]
             new_csv_filename = os.path.join(self.LogPath, serial + os.path.basename(csv_filename)).replace("{OPN}", opn)
             new_img_filename = os.path.join(self.LogPath, serial + os.path.basename(img_filename)).replace("{OPN}", opn)
             if not old_csv_filename:
@@ -335,6 +347,9 @@ class MainAppWindow(QMainWindow):
                 "Result (csv file)": new_csv_filename,
                 "Result": "PASS"
             }
+            if opn == "IN323":
+                df_fits["Gluing Weight jig"] = subserial
+            
 
             parameters = ",".join(df_fits.keys())
             values = ",".join(df_fits.values())
