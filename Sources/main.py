@@ -206,7 +206,7 @@ class MainAppWindow(QMainWindow):
                         self.TableWidget.setItem(row, 2, QTableWidgetItem(product))
                         self.TableWidget.setItem(row, 3, QTableWidgetItem(next_opn))
                         if next_opn == "IN323":
-                            target_header = "Weight jig"
+                            target_header = "Sub-Serial"
                             baking_col = -1
                             # เช็คก่อนว่ามี column Baking Clamp อยู่แล้วไหม
                             for col in range(self.TableWidget.columnCount()):
@@ -317,7 +317,7 @@ class MainAppWindow(QMainWindow):
             pn = row["Part Number"]
             opn = row["Operation"]
             product = row["Product Model"]
-            subserial = row["Weight jig"]
+            subserial = row["Sub-Serial"]
             new_csv_filename = os.path.join(self.LogPath, serial + os.path.basename(csv_filename)).replace("{OPN}", opn)
             new_img_filename = os.path.join(self.LogPath, serial + os.path.basename(img_filename)).replace("{OPN}", opn)
             if not old_csv_filename:
@@ -348,7 +348,7 @@ class MainAppWindow(QMainWindow):
                 "Result": "PASS"
             }
             if opn == "IN323":
-                df_fits["Gluing Weight jig"] = subserial
+                df_fits["Fixture"] = subserial
             
 
             parameters = ",".join(df_fits.keys())
