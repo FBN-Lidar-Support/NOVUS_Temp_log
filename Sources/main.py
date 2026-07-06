@@ -338,7 +338,7 @@ class MainAppWindow(QMainWindow):
                 "MC": str(self.MC),
                 "PN": str(pn),
                 "SN": str(serial),
-                "Machine": str(mc_oven),
+                "Oven Machine": str(mc_oven),
                 "Temp target (°C)": str(self.temp_target),
                 "Time target (minute)": str(int(self.hold_seconds/60)),
                 "Start time": str(datetimestart),
