@@ -50,11 +50,6 @@ class MainAppWindow(QMainWindow):
             self.exit_confirm_enabled = False
             quit()
 
-        # self.fits = FITS_Web_Serivce()
-        # if self.fits.getStatusURL() != "OK":
-        #     QMessageBox(self, "FITS Connection Failed", "Please check internet connnection to connect to Fabrinet server.")
-        #     quit()
-
         if not os.path.exists(self.LogPath):
             os.makedirs(self.LogPath, exist_ok=True)
 
@@ -135,7 +130,7 @@ class MainAppWindow(QMainWindow):
         QTimer.singleShot(100, self.select_ORA)
 
     def select_ORA(self):
-        ORA_list = list(self.config._sections['CUS-2156-031'].keys())
+        ORA_list = list(self.config._sections[self.MC].keys())
         ORA_list = list(map(str.upper, ORA_list))
         oven_name, ok = QInputDialog.getItem(self, "Choose Oven ORA#", "Choose Oven:", ORA_list, 0, False)
         if not ok:
@@ -317,7 +312,8 @@ class MainAppWindow(QMainWindow):
             pn = row["Part Number"]
             opn = row["Operation"]
             product = row["Product Model"]
-            subserial = row["Sub-Serial"]
+            if opn == "IN323":
+                subserial = row["Sub-Serial"]
             new_csv_filename = os.path.join(self.LogPath, serial + os.path.basename(csv_filename)).replace("{OPN}", opn)
             new_img_filename = os.path.join(self.LogPath, serial + os.path.basename(img_filename)).replace("{OPN}", opn)
             if not old_csv_filename:
