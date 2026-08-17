@@ -3,13 +3,29 @@ import serial.tools.list_ports
 from datetime import datetime
 
 def find_datalog_port():
+    DATALOG_LIST = {}
     port_list = []
     ports = serial.tools.list_ports.comports()
     for p in ports:
         if p.description.startswith('LogBox-WiFi'):
             port_list.append(p.device)
-    return port_list
-
+    if not port_list:
+        return None
+    for comport in port_list:
+        logbox = ModbusSerialClient(port=comport, baudrate=9600, timeout=1)
+        result = logbox.read_holding_registers(address=0x03, count=100)
+        mac_index = result.registers[2:5]
+        # print(mac_index)
+        mac_bytes = []
+        for reg in mac_index:
+            high_byte = (reg >> 8) & 0xFF
+            low_byte = reg & 0xFF
+            mac_bytes.extend([high_byte, low_byte])
+            mac_str = ":".join(f"{b:02X}" for b in mac_bytes)
+        # print("MAC ADDRSS: ", mac_str)
+        DATALOG_LIST[comport] = mac_str
+    return DATALOG_LIST
+        
 def read_temp(comport: str="COM4", channel:int=1): 
     logbox = ModbusSerialClient(port=comport, baudrate=9600, timeout=1)
     if channel == 1:
@@ -50,3 +66,6 @@ def readmuti_temp(comport: str="COM4", channel_list:list=[1, 2, 3]):
     logbox.close()
     # print(f"full return is {result.registers}")
     return log_array
+
+# x = find_datalog_port()
+# print(x)
