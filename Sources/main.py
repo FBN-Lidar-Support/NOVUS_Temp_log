@@ -56,24 +56,16 @@ class MainAppWindow(QMainWindow):
         uic.loadUi(r"C:\Projects\novus_Temp_log\Sources\GUI\Main_UI.ui", self)
         self.TableWidget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
-        # comport_list = find_datalog_port()
-        # if not comport_list:
-        #     QMessageBox.critical(self, "Datalog disconnect", "Datalog COMPORT not found\nPlease check USB cable from Data logger to PC")
-        #     quit()
-        # print(comport_list)
-        # for port in comport_list:
-        #     WINDOW_NAME = f"Auto_TempLog_{port}"
-        #     windows = gw.getWindowsWithTitle(WINDOW_NAME)
-        
-        #     print(windows)
-        #     if not windows:
-        #         self.setWindowTitle("WINDOW_NAME")
-        #         self.COMPORT = port
-        #         self.comport_value.setText(port)
-        #         break
-        # else:
-        #     QMessageBox.critical(self, "All window already Running", "All window already Running\nPlease close old window before run new window")
-        #     quit()
+        comport_list = find_datalog_port()
+        if not comport_list:
+            QMessageBox.critical(self, "Datalog disconnect", "Datalog COMPORT not found\nPlease check USB cable from Data logger to PC")
+            quit()
+            
+        print(comport_list)
+        self.oven_port = {}
+        for port, mac in comport_list.items():
+            ORA_OVEN = self.config["CUS-2156-031"].get(mac.replace(":", "-"), "")
+            self.oven_port[ORA_OVEN] = port
 
         if not os.path.exists(self.LogPath):
             os.makedirs(self.LogPath, exist_ok= True)
@@ -130,13 +122,13 @@ class MainAppWindow(QMainWindow):
         QTimer.singleShot(100, self.select_ORA)
 
     def select_ORA(self):
-        ORA_list = list(self.config._sections[self.MC].keys())
+        ORA_list = list(self.oven_port.keys())
         ORA_list = list(map(str.upper, ORA_list))
         oven_name, ok = QInputDialog.getItem(self, "Choose Oven ORA#", "Choose Oven:", ORA_list, 0, False)
         if not ok:
             print("Quit Program")
             quit()
-        port = self.config[self.MC].get(oven_name, "").upper()
+        port = self.oven_port[oven_name]
         WINDOW_NAME = f"Auto_TempLog_{port}"        
         windows = gw.getWindowsWithTitle(WINDOW_NAME)
         if not windows:

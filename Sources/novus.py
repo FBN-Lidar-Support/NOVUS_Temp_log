@@ -9,6 +9,8 @@ def find_datalog_port():
     for p in ports:
         if p.description.startswith('LogBox-WiFi'):
             port_list.append(p.device)
+    if not port_list:
+        return None
     for comport in port_list:
         logbox = ModbusSerialClient(port=comport, baudrate=9600, timeout=1)
         result = logbox.read_holding_registers(address=0x03, count=100)
