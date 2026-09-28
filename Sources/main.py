@@ -64,7 +64,7 @@ class MainAppWindow(QMainWindow):
         print(comport_list)
         self.oven_port = {}
         for port, mac in comport_list.items():
-            ORA_OVEN = self.config["CUS-2156-031"].get(mac.replace(":", "-"), "")
+            ORA_OVEN = self.config[self.MC].get(mac.replace(":", "-"), "")
             self.oven_port[ORA_OVEN] = port
 
         if not os.path.exists(self.LogPath):
