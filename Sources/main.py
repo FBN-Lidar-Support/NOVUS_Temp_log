@@ -1,21 +1,19 @@
 import os
 import sys
-import time
 import pandas as pd
 import configparser
 import pygetwindow as gw
-from datetime import timedelta
 from PyQt6 import uic, QtWidgets
 from PyQt6.QtWidgets import QApplication, QHeaderView, QMainWindow, QInputDialog, QLineEdit, QTableWidget, QTableWidgetItem, QMessageBox
 from PyQt6.QtCore import QTimer, QUrl, Qt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 import matplotlib.dates as mdates
-
-from novus import read_temp, find_datalog_port
+from novus import read_temp, find_datalog_port, LogboxReadError, STATUS_OK
 from fitsdll import fn_Handshake, fn_Query, fn_Log
+from oven_run import OvenRun
+from recorder import LiveLog, record_results
 # from webservice import FITS_Web_Serivce
-
 # Matplotlib canvas class to create figure
 class MplCanvas(Canvas):
     def __init__(self, parent=None):
@@ -25,14 +23,12 @@ class MplCanvas(Canvas):
         self.setParent(parent)
         # self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self.updateGeometry()
-
     def save_image(self, filepath):
         self.figure.savefig(
             filepath,
             dpi=150,
             bbox_inches="tight"
         )
-
 class MainAppWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -49,13 +45,13 @@ class MainAppWindow(QMainWindow):
             QMessageBox.critical(None, "Close Program", f"{e}\nPlease check config.ini")
             self.exit_confirm_enabled = False
             quit()
-
         if not os.path.exists(self.LogPath):
             os.makedirs(self.LogPath, exist_ok=True)
-
+        if self.MC not in self.config:
+            QMessageBox.critical(None, "Close Program", f"Computer name '{self.MC}' not found in Config.ini\nPlease check config.ini")
+            sys.exit(1)
         uic.loadUi(r"C:\Projects\novus_Temp_log\Sources\GUI\Main_UI.ui", self)
         self.TableWidget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-
         comport_list = find_datalog_port()
         if not comport_list:
             QMessageBox.critical(self, "Datalog disconnect", "Datalog COMPORT not found\nPlease check USB cable from Data logger to PC")
@@ -64,54 +60,42 @@ class MainAppWindow(QMainWindow):
         print(comport_list)
         self.oven_port = {}
         for port, mac in comport_list.items():
-            ORA_OVEN = self.config[self.MC].get(mac.replace(":", "-"), "")
-            self.oven_port[ORA_OVEN] = port
-
+            ORA_OVEN = self.config[self.MC].get(mac.replace(":", "-"), "").strip()
+            if not ORA_OVEN:
+                print(f"Datalog {mac} on {port} is not in Config.ini [{self.MC}], skipped")
+                continue
+            self.oven_port[ORA_OVEN.upper()] = port
+        if not self.oven_port:
+            QMessageBox.critical(self, "Datalog not in config", f"No datalog on this PC is listed in Config.ini [{self.MC}]\nPlease check config.ini")
+            sys.exit(1)
         if not os.path.exists(self.LogPath):
             os.makedirs(self.LogPath, exist_ok= True)
         
         self.canvas = MplCanvas(self)
-
         layout = self.GraphWidget.layout()
         if layout is None:
             layout = QtWidgets.QVBoxLayout(self.GraphWidget)
             layout.setContentsMargins(0,0,0,0)
             layout.setSpacing(0)
             self.GraphWidget.setLayout(layout)
-
         layout.addWidget(self.canvas)
-
         self.canvas.ax.set_title("Oven Temperature")
         self.canvas.ax.set_xlabel("Time (H:M:S)")
         self.canvas.ax.set_ylabel("Temperature (°C)")
         self.canvas.ax.grid(True)
-
         self.canvas.ax.xaxis.set_major_formatter(
             mdates.DateFormatter("%H:%M:%S")
         )
         self.canvas.fig.autofmt_xdate()
-
         self.temp_target = None
         self.hold_seconds = None
         
-        self.trigger_region = None
-        self.trigger_time = None
-        self.stop_time = None
-        self.triggered = False
         self.span = None
-
         self.serial_list = []
-
-        # self.max_points = 600 
-        # self.x_live = deque(maxlen=self.max_points)
-        # self.y_live = deque(maxlen=self.max_points)
-        self.x_live = []
-        self.y_live = []
-
+        self.read_fail_count = 0
+        self.run = None    # OvenRun: readings + hold-time logic of the current bake
+        self.live = None   # LiveLog: checkpoint file written on every reading
         (self.line,) = self.canvas.ax.plot([], [], linewidth = 2)
-
-        self.oven_status = []
-
         self.canvas.draw()
         
         self.EN_Value.setFocus()
@@ -120,7 +104,6 @@ class MainAppWindow(QMainWindow):
         self.AddSNButton.clicked.connect(self.Add_Serials)
         
         QTimer.singleShot(100, self.select_ORA)
-
     def select_ORA(self):
         ORA_list = list(self.oven_port.keys())
         ORA_list = list(map(str.upper, ORA_list))
@@ -140,29 +123,43 @@ class MainAppWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "Oven Occupied", f"{oven_name} already running!\nPlease change Oven")
             QTimer.singleShot(100, self.select_ORA)
-
     def on_start_clicked(self):
-        self.StartButton.setEnabled(False)
         print("start")
-        self.reset_run()
-        if len(self.EN_Value.text()) == 6:
-            if not self.Oven_ID.text() == "":
-                if self.TableWidget.rowCount() != 0:
-                    self.Oven_Status.setText("Operate")
-                    self.Oven_Status.setStyleSheet("background-color: orange; color black; font-weight: bold;")
-                    self.temp_target = int(self.Target.currentText().split("°C")[0])
-                    self.hold_seconds = int(self.Duration.currentText().split("(")[1].split("sec)")[0])
-                    self.QuitButton.setEnabled(False)
-                    self.timer = QTimer(self)
-                    self.timer.timeout.connect(self.update_graph)
-                    self.timer.start((self.tick_speed * 1000)) # read temp speed per point
-                else:
-                    QMessageBox.warning(self, "Start denied", """Please Press button "Add serial" to add serial before press start""")
-            else:
-                QMessageBox.warning(self, "Start denied", "Please scan Oven ID before press start")
-        else:
+        if len(self.EN_Value.text()) != 6:
             QMessageBox.warning(self, "Start denied", "employee ID must have 6 digit")
-
+            return
+        if self.Oven_ID.text() == "":
+            QMessageBox.warning(self, "Start denied", "Please scan Oven ID before press start")
+            return
+        if self.TableWidget.rowCount() == 0:
+            QMessageBox.warning(self, "Start denied", 'Please Press button "Add serial" to add serial before press start')
+            return
+        temp_target = int(self.Target.currentText().split("°C")[0])
+        hold_seconds = int(self.Duration.currentText().split("(")[1].split("sec)")[0])
+        allowed = self.allowed_operations(temp_target, hold_seconds)
+        bad = []
+        for r in range(self.TableWidget.rowCount()):
+            sn = self.TableWidget.item(r, 0)
+            opn = self.TableWidget.item(r, 3)
+            if opn is None or opn.text() not in allowed:
+                bad.append(f"{sn.text() if sn else '?'} ({opn.text() if opn else '?'})")
+        if bad:
+            QMessageBox.warning(self, "Start denied",
+                                f"These serials can not be baked at {temp_target}°C / {hold_seconds} sec:\n"
+                                + "\n".join(bad) +
+                                "\nPlease change Target / Duration or remove the serial.")
+            return
+        self.StartButton.setEnabled(False)
+        self.reset_run()
+        self.run = OvenRun(temp_target, hold_seconds)
+        self.Oven_Status.setText("Operate")
+        self.Oven_Status.setStyleSheet("background-color: orange; color black; font-weight: bold;")
+        self.QuitButton.setEnabled(False)
+        self.live = LiveLog(self.LogPath, self.Oven_ID.text().strip())
+        self.live.start()
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_graph)
+        self.timer.start((self.tick_speed * 1000)) # read temp speed per point
     def Add_Serials(self):
         cancal = False
         while not cancal:
@@ -171,18 +168,23 @@ class MainAppWindow(QMainWindow):
             serial, okPressed = QInputDialog.getText(self, "Insert Serial", "Please Insert serial:")
             if okPressed and serial:
                 if serial in self.serial_list:
-                    QMessageBox(self, "Duplicate Serial", f"Serial: {serial} already registered")
+                    QMessageBox.warning(self, "Duplicate Serial", f"Serial: {serial} already registered")
                     continue
                 # query = self.fits.FIT_Query("*", "*", serial, "#NEXT_OPN,#SHIPDATE,#Part_No,#product").split(",")
-                query = fn_Query("*", "*", serial, "#NEXT_OPN,#SHIPDATE,#Part_No,#product").split(",")
+                query_result = fn_Query("*", "*", serial, "#NEXT_OPN,#SHIPDATE,#Part_No,#product")
+                if not query_result:
+                    QMessageBox.critical(self, "FITS ERROR", "Can not query FITs\nPlease check FITs connection")
+                    continue
+                query = [q.strip() for q in query_result.split(",")]
                 print(query)
-                if query == [''] or query == ['None']:
+                if len(query) < 4 or all(q in ("", "None") for q in query):
+                    QMessageBox.warning(self, "Serial not found", f"Serial {serial} not found in FITs")
                     continue
                 next_opn = query[0]
                 shipdate = query[1]
                 part_no = query[2]
                 product = query[3]
-                opn_list = self.config["Operation Config"].get(f"{self.temp_target}-{self.hold_seconds}", "").split(",")
+                opn_list = self.allowed_operations(self.temp_target, self.hold_seconds)
                 if shipdate == "" or shipdate == "-":
                     if next_opn in opn_list:
                         self.serial_list.append(serial)
@@ -216,168 +218,82 @@ class MainAppWindow(QMainWindow):
                     continue
             else:
                 cancal = True
-
     def update_graph(self):
-        now, status, temp = read_temp(self.COMPORT, 1)
+        try:
+            now, status, temp = read_temp(self.COMPORT, 1)
+        except LogboxReadError as e:
+            self.handle_read_failure(str(e))
+            return
+        if status != STATUS_OK:
+            # 2=Underflow, 3=Overflow, 4=Cold joint error, 5=Open sensor
+            self.handle_read_failure(f"channel status = {status} (5 = open sensor)")
+            return
+        if self.read_fail_count:
+            self.read_fail_count = 0
+            self.Oven_Status.setText("Operate")
+            self.Oven_Status.setStyleSheet("background-color: orange; color black; font-weight: bold;")
+        # ----- store reading -----
+        state = self.run.add_reading(now, temp)
+        self.live.append(now, temp, state)
         # ----- live plot -----
-        self.x_live.append(now)
-        # self.y_live.append(temp+0.5)
-        self.y_live.append(temp)
-
-        x_num = mdates.date2num(list(self.x_live))
-        self.line.set_data(x_num, list(self.y_live))
-
-        if self.triggered and self.trigger_time is not None:
-            self.oven_status.append("Heated")
-            t0 = mdates.date2num(self.trigger_time)
-            t1 = x_num[-1]
-
+        x_num = mdates.date2num(self.run.times)
+        self.line.set_data(x_num, self.run.temps)
+        if state == "Heated":
             if self.span is not None:
                 self.span.remove()
-            
             self.span = self.canvas.ax.axvspan(
-                t0, 
-                t1, 
+                mdates.date2num(self.run.trigger_time),
+                x_num[-1],
                 color="orange",
                 alpha=0.25,
                 zorder=0
             )
-        else:
-            self.oven_status.append("Warm-Up")
-
-        # ----- trigger ครั้งแรก -----
-        if self.trigger_time is None and temp >= self.temp_target:
-            self.trigger_time = now
-            self.stop_time = now + timedelta(seconds=self.hold_seconds)
-            self.triggered = True
-
         # ----- countdown -----
-        if self.stop_time is not None:
-            remaining = int((self.stop_time - now).total_seconds() / 60)
-            if remaining > 1:
-                self.TimeLeftLabel.setText(f"{max(0, remaining)} mins.")
-            else:
-                self.TimeLeftLabel.setText("< 1 mins.")
-            if now >= self.stop_time:
+        minutes = self.run.minutes_left(now)
+        if minutes is not None:
+            self.TimeLeftLabel.setText(f"{minutes} mins." if minutes > 1 else "< 1 mins.")
+            if self.run.is_finished(now):
                 self.timer.stop()
                 self.TimeLeftLabel.setText("Done")
                 print("Done")
                 QTimer.singleShot(100, self.Result_insert_and_record)
                 return
-            
         # ----- write Graph with new data -----
         self.canvas.ax.relim()
         self.canvas.ax.autoscale_view()
         self.canvas.draw_idle() # update Graph
 
     def Result_insert_and_record(self):
-        mc_oven = self.Oven_ID.text().strip()
-        df_result = pd.DataFrame({"Datetime": self.x_live, "Oven Tempture": self.y_live, "Oven Status": self.oven_status})
-        # df_result_filtered = df_result["Oven Status"] == "Heated"
-        # print(df_result_filtered)
-
-        Qtable_df = self.qtable_to_df(self.TableWidget)
-        # print(Qtable_df)
-        
-        datetimestart = df_result["Datetime"].iloc[0].strftime("%Y-%m-%d_%H-%M-%S")
-        datetimeend = df_result["Datetime"].iloc[-1].strftime("%Y-%m-%d_%H-%M-%S")        
-
-        img_filename = os.path.join(self.LogPath, f"_{{OPN}}_ORA{mc_oven}_{datetimeend}.jpg")
-        self.canvas.save_image(img_filename)
-        time.sleep(0.5)
-        if os.path.exists(img_filename):
-            pass
-        else:
-            QMessageBox.critical(self, "FAIL record fits", "Can not generate image file\nPlease contact Engineer",)
+        try:
+            failures = record_results(
+                log_path=self.LogPath,
+                run=self.run,
+                oven_id=self.Oven_ID.text().strip(),
+                employee_id=self.EN_Value.text().strip(),
+                machine=self.MC,
+                table_df=self.qtable_to_df(self.TableWidget),
+                save_image=self.canvas.save_image,
+                log_fn=fn_Log,
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "FAIL record fits", f"{e}\nPlease contact Engineer\n(LIVE file is kept in {self.LogPath})")
+            self.StartButton.setEnabled(True)
+            self.QuitButton.setEnabled(True)
             return
-        
-        csv_filename = os.path.join(self.LogPath, f"_{{OPN}}_ORA{mc_oven}_{datetimeend}.csv")
-        df_result.to_csv(csv_filename, index=False)
-        en = self.EN_Value.text().strip()
-
-        old_csv_filename = None
-        old_img_filename = None
-        
-        for idx, row in Qtable_df.iterrows():
-            serial = row["Serial Number"]
-            # print("serial:\t", serial)
-            pn = row["Part Number"]
-            opn = row["Operation"]
-            product = row["Product Model"]
-            if opn == "IN323":
-                subserial = row["Sub-Serial"]
-            new_csv_filename = os.path.join(self.LogPath, serial + os.path.basename(csv_filename)).replace("{OPN}", opn)
-            new_img_filename = os.path.join(self.LogPath, serial + os.path.basename(img_filename)).replace("{OPN}", opn)
-            if not old_csv_filename:
-                os.rename(csv_filename, new_csv_filename)
-            else:
-                os.rename(old_csv_filename, new_csv_filename)
-            print(new_csv_filename)
-            new_csv_filename = new_csv_filename.replace("\\","\\\\")
-            if not old_img_filename:
-                os.rename(img_filename, new_img_filename)
-            else:
-                os.rename(old_img_filename, new_img_filename)   
-            print(new_img_filename)
-            new_img_filename = new_img_filename.replace("\\","\\\\")
-            print("===============================================================")
-            df_fits = {
-                "EN": str(en),
-                "MC": str(self.MC),
-                "PN": str(pn),
-                "SN": str(serial),
-                "Oven Machine": str(mc_oven),
-                "Temp target (°C)": str(self.temp_target),
-                "Time target (minute)": str(int(self.hold_seconds/60)),
-                "Start time": str(datetimestart),
-                "End time": str(datetimeend),
-                "Result (Graph)": new_img_filename,
-                "Result (csv file)": new_csv_filename,
-                "Result": "PASS"
-            }
-            if opn == "IN323":
-                df_fits["Fixture"] = subserial
-            
-
-            parameters = ",".join(df_fits.keys())
-            values = ",".join(df_fits.values())
-
-            # log_status = self.fits.FIT_Log(product, opn, parameters, values)
-            log_status = fn_Log(product, opn, parameters, values)
-            if log_status == True:
-                print(f"Serial: {serial} FITs Completed")
-            else:
-                print(f"Serial: {serial} FITs not Complete")
-                print(log_status)
-                QMessageBox.critical(self, "FITs insert failed", f"Please conact EXT:7763 Atthaphanp\n{log_status}")
-            old_csv_filename = new_csv_filename
-            old_img_filename = new_img_filename
-            
+        if failures:
+            detail = "\n".join(f"{sn}: {msg}" for sn, msg in failures)
+            QMessageBox.critical(self, "FITs insert failed", f"Please conact EXT:7763 Atthaphanp\n{detail}")
+        else:
+            self.live.remove()  # checkpoint no longer needed
         self.Oven_Status.setText("Idle")
         self.Oven_Status.setStyleSheet("background-color: rgb(170, 255, 127); color black; font-weight: bold;")
         self.TableWidget.setRowCount(0)
-        print("===============================================================")
-        os.rename(old_csv_filename, csv_filename)
-        
-        os.rename(old_img_filename, img_filename)
+        self.serial_list.clear()
         QMessageBox.information(self, "Finish Oven Record", "Please remove unit out of oven")
         self.StartButton.setEnabled(True)
         self.QuitButton.setEnabled(True)
-
     def reset_run(self):
-        self.trigger_time = None
-        self.stop_time = None
-        self.triggered = False
-
-        self.temp_target = None
-        self.hold_seconds = None
-
-        self.serial_list.clear()
-
-        self.x_live.clear()
-        self.y_live.clear()
-        self.oven_status.clear()
-
+        self.span = None
         self.canvas.ax.clear()
         self.canvas.ax.set_title("Oven Temperature")
         self.canvas.ax.set_xlabel("Time (H:M:S)")
@@ -388,20 +304,25 @@ class MainAppWindow(QMainWindow):
             )
         self.line, = self.canvas.ax.plot([], [], color= "black")
         self.canvas.draw_idle()
-
         self.TimeLeftLabel.setText("Waiting...")
-
     def on_quit_clicked(self):
         self.allow_close = True
         self.close()
-
     def closeEvent(self, event):
         if self.allow_close:
             print("Close Software")
             event.accept()
         else:
             event.ignore()
-
+    def allowed_operations(self, temp_target, hold_seconds):
+        raw = self.config["Operation Config"].get(f"{temp_target}-{hold_seconds}", "")
+        return [o.strip() for o in raw.split(",") if o.strip()]
+    # -------------------- Read errors --------------------
+    def handle_read_failure(self, reason):
+        self.read_fail_count += 1
+        print(f"Read failed ({self.read_fail_count}): {reason}")
+        self.Oven_Status.setText(f"Read error x{self.read_fail_count}")
+        self.Oven_Status.setStyleSheet("background-color: red; color: white; font-weight: bold;")
     # -------------------- Helper --------------------
     def qtable_to_df(self, table):
         header = []
@@ -424,7 +345,6 @@ class MainAppWindow(QMainWindow):
                 cell = table.item(r, c)
                 row[h] = cell.text() if cell else ""
             data.append(row)
-
         return pd.DataFrame(data)
     
 if __name__ == "__main__":

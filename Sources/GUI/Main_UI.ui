@@ -163,6 +163,21 @@
            <attribute name="verticalHeaderStretchLastSection">
             <bool>false</bool>
            </attribute>
+           <row>
+            <property name="text">
+             <string>1</string>
+            </property>
+           </row>
+           <row>
+            <property name="text">
+             <string>2</string>
+            </property>
+           </row>
+           <row>
+            <property name="text">
+             <string>3</string>
+            </property>
+           </row>
            <column>
             <property name="text">
              <string>Serial Number</string>
@@ -183,6 +198,66 @@
              <string>Operation</string>
             </property>
            </column>
+           <item row="0" column="0">
+            <property name="text">
+             <string>CIN000000001</string>
+            </property>
+           </item>
+           <item row="0" column="1">
+            <property name="text">
+             <string>TEST</string>
+            </property>
+           </item>
+           <item row="0" column="2">
+            <property name="text">
+             <string>Main line</string>
+            </property>
+           </item>
+           <item row="0" column="3">
+            <property name="text">
+             <string>IN999</string>
+            </property>
+           </item>
+           <item row="1" column="0">
+            <property name="text">
+             <string>CIN000000002</string>
+            </property>
+           </item>
+           <item row="1" column="1">
+            <property name="text">
+             <string>TEST</string>
+            </property>
+           </item>
+           <item row="1" column="2">
+            <property name="text">
+             <string>Main line</string>
+            </property>
+           </item>
+           <item row="1" column="3">
+            <property name="text">
+             <string>IN999</string>
+            </property>
+           </item>
+           <item row="2" column="0">
+            <property name="text">
+             <string>CIN000000003</string>
+            </property>
+           </item>
+           <item row="2" column="1">
+            <property name="text">
+             <string>TEST</string>
+            </property>
+           </item>
+           <item row="2" column="2">
+            <property name="text">
+             <string>Main line</string>
+            </property>
+           </item>
+           <item row="2" column="3">
+            <property name="text">
+             <string>IN999</string>
+            </property>
+           </item>
           </widget>
          </item>
          <item row="12" column="2">
@@ -548,6 +623,11 @@
              <string>20 Mins (1200 sec)</string>
             </property>
            </item>
+           <item>
+            <property name="text">
+             <string>1 Mins (60 sec)</string>
+            </property>
+           </item>
           </widget>
          </item>
          <item row="9" column="0">
@@ -633,6 +713,11 @@
            <item>
             <property name="text">
              <string>80 °C</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>30 °C</string>
             </property>
            </item>
           </widget>
